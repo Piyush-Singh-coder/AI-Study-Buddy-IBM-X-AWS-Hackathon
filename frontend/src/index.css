@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-main text-neo-black font-medium;
+  }
+}
+
+/* Custom Scrollbar for Neo-Brutalism */
+::-webkit-scrollbar {
+  width: 12px;
+}
+::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-left: 2px solid black;
+}
+::-webkit-scrollbar-thumb {
+  background: #8B5CF6; 
+  border: 2px solid black;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7C3AED; 
+}
