@@ -65,6 +65,22 @@ class ProcessorService:
         else:
             return f"[Skipped unsupported file: {filename}]", {}
 
+    def process_file_sync(self, content: bytes, filename: str, content_type: str) -> tuple[str, dict]:
+        """Synchronous file processing for background tasks. Takes pre-read content."""
+        file_stream = BytesIO(content)
+        file_stream.name = filename
+
+        if "pdf" in content_type or filename.endswith(".pdf"):
+            return self.process_pdf(file_stream, filename)
+        elif "image" in content_type or filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            text = self.process_image(content)
+            return text, {"source": filename, "type": "image"}
+        elif "audio" in content_type or filename.lower().endswith(('.mp3', '.wav', '.m4a', '.mpeg')):
+            text = self.process_audio_sync(content, filename)
+            return text, {"source": filename, "type": "audio"}
+        else:
+            return f"[Skipped unsupported file: {filename}]", {}
+
     def process_pdf(self, file_stream, filename: str) -> tuple[str, dict]:
         """Process PDF and return text with page numbers embedded."""
         if not PdfReader:
@@ -226,18 +242,30 @@ class ProcessorService:
                 'no_warnings': True,
                 'nocheckcertificate': True,
                 'noplaylist': True,
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                },
+                'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+                'force_ipv4': True,
             }
             
             if os.path.exists(temp_filename):
                 os.remove(temp_filename)
 
             # Get video info first
-            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                info = ydl.extract_info(url, download=False)
-                video_title = info.get('title', 'Unknown')
-                duration = info.get('duration', 0)
-
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                try:
+                    info = ydl.extract_info(url, download=False)
+                    video_title = info.get('title', 'Unknown')
+                    duration = info.get('duration', 0)
+                except Exception as info_error:
+                    print(f"Error extracting info (continuing to download): {info_error}")
+                    video_title = "YouTube Video" 
+                    duration = 0
+
+                # Download
                 ydl.download([url])
             
             if not os.path.exists(temp_filename):

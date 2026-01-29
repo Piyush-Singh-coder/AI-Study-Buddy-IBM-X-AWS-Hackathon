@@ -194,21 +194,24 @@ Instructions:
         if not text_context or text_context == "full_context_trigger":
             return self.generate_summary_from_store(summary_type, source_filter)
             
-        prompt_style = "Provide a concise, 1-paragraph overview." if summary_type == "brief" else "Provide a comprehensive, detailed study note with bullet points and key definitions."
+        prompt_style = "Provide a comprehensive summary (approx 300 words) capturing all key ideas, important facts, and conclusions. Do not be too brief." if summary_type == "brief" else "Provide a comprehensive, detailed study note with bullet points, key definitions, important dates, formulas, and arguments. Do NOT leave out any important details."
         
-        prompt = f"{prompt_style}\n\nContext:\n{text_context[:15000]}"
+        prompt = f"{prompt_style}\n\nContext:\n{text_context[:25000]}" # Increased limit for detailed
         messages = [{"role": "user", "content": prompt}]
         response = self.llm.invoke(messages)
         return response.content
         
     def generate_summary_from_store(self, summary_type: str = "detailed", source_filter: str = None):
-        query = "Summarize the main concepts briefly." if summary_type == "brief" else "Provide detailed study notes covering all key topics in the material."
+        query = "Summarize the material in detail (approx 300-400 words)." if summary_type == "brief" else "Provide an exhaustive study guide covering ALL key topics, definitions, arguments, and details in the material."
         
         if source_filter and source_filter != "all":
             query = f"Summarize the content from {source_filter}: {query}"
         
+        # INCREASED K for detailed summary to capture more context
+        k_val = 20 if summary_type == "brief" else 100
+        
         # Use filtered retriever
-        retriever = self._get_session_retriever(k=20, source_filter=source_filter)
+        retriever = self._get_session_retriever(k=k_val, source_filter=source_filter)
         docs = retriever.invoke(query)
         
         if not docs:
@@ -216,7 +219,25 @@ Instructions:
 
         context, sources = self._format_docs_with_sources(docs)
         
-        prompt = f"""You are an expert study assistant.
+        # Enhanced Prompt for Detailed Summary
+        if summary_type == "detailed":
+            prompt = f"""You are an expert academic tutor creating a DETAILED STUDY GUIDE.
+            
+Context from selected documents ({source_filter if source_filter else 'All'}):
+{context}
+
+Request: {query}
+
+Instructions:
+1. Your goal is to be EXHAUSTIVE. The student should not need to read the original text after reading your summary.
+2. Structure the output uses clear Headings, Bullet Points, and Bold text for key terms.
+3. Include ALL important definitions, dates, names, formulas, and key arguments.
+4. If the content covers multiple distinct topics, create a section for each.
+5. Do not summarize briefly; go into depth.
+6. Use the provided context ONLY. Do not hallucinate.
+"""
+        else:
+            prompt = f"""You are an expert study assistant.
         
 Context from selected documents ({source_filter if source_filter else 'All'}):
 {context}
@@ -225,9 +246,10 @@ Request: {query}
 
 Instructions:
 1. Focus ONLY on the provided context.
-2. { 'Keep it concise (1-2 paragraphs).' if summary_type == 'brief' else 'Use bullet points, bold key terms, and clearly structure sections.' }
+2. Write a clear, multi-paragraph summary (approx 300 words) that covers the main narrative and key points.
 3. If the context is limited, summarize what is available.
 """
+
         messages = [{"role": "user", "content": prompt}]
         response = self.llm.invoke(messages)
         return response.content

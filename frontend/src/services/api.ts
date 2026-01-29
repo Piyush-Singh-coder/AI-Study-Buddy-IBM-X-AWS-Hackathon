@@ -18,14 +18,14 @@ export const deleteSession = async (sessionId: string) => {
   return response.data;
 };
 
-export const getOrCreateSession = async () => {
+export const getOrCreateSession = async (): Promise<string> => {
   let sessionId = localStorage.getItem("study_session_id");
   if (!sessionId) {
     const data = await createSession();
     sessionId = data.session_id;
-    localStorage.setItem("study_session_id", sessionId);
+    localStorage.setItem("study_session_id", sessionId!);
   }
-  return sessionId;
+  return sessionId!;
 };
 
 // Upload
