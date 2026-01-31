@@ -82,8 +82,20 @@ class RAGService:
         
         metadatas = [base_metadata.copy() for _ in texts]
         
-        self.vector_store.add_texts(texts, metadatas=metadatas)
-        return len(texts)
+        # Batch insertions to avoid hitting DB packet limits (specifically for large PDFs)
+        batch_size = 50
+        total_added = 0
+        
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            batch_metadatas = metadatas[i:i + batch_size]
+            try:
+                self.vector_store.add_texts(batch_texts, metadatas=batch_metadatas)
+                total_added += len(batch_texts)
+            except Exception as e:
+                print(f"Error inserting batch {i//batch_size}: {e}")
+                
+        return total_added
 
     def delete_session_documents(self, session_id: str) -> int:
         try:

@@ -86,7 +86,7 @@ const Dashboard = () => {
       const interval = setInterval(async () => {
         const done = await checkStatus();
         if (done) clearInterval(interval);
-      }, 2000);
+      }, 5000); // Increased to 5s to reduce log spam
 
       // Timeout after 60s
       setTimeout(() => {
@@ -94,7 +94,10 @@ const Dashboard = () => {
         toast.dismiss(toastId);
       }, 60000);
 
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        toast.dismiss(toastId); // Dismiss toast if user leaves page
+      };
     }
   }, [location.state]);
 

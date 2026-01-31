@@ -73,7 +73,36 @@ async def generate_educational_image(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
+        print(f"AWS Image Gen Failed: {e}. Falling back to OpenAI DALL-E 3...")
+        try:
+            # Fallback to OpenAI DALL-E 3
+            import openai
+            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            
+            response = client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+            
+            image_url = response.data[0].url
+            
+            # Download prompt image to get base64 (to match frontend expectation)
+            import requests
+            img_response = requests.get(image_url)
+            base64_image = base64.b64encode(img_response.content).decode('utf-8')
+            
+            return {
+                "success": True,
+                "image_data": base64_image,
+                "original_topic": topic,
+                "prompt_used": prompt,
+                "note": "Image generated with OpenAI DALL-E 3 (Fallback)"
+            }
+        except Exception as openai_error:
+            raise HTTPException(status_code=500, detail=f"Image generation failed (AWS & OpenAI): {str(openai_error)}")
 
 
 @router.post("/generate-from-context")
@@ -158,4 +187,35 @@ Create a prompt that describes a clear, educational visual representation. Focus
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
+        print(f"AWS Context Image Gen Failed: {e}. Falling back to OpenAI...")
+        try:
+             # Fallback to OpenAI DALL-E 3
+            import openai
+            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            
+            # Use the optimized prompt we already generated
+            response = client.images.generate(
+                model="dall-e-3",
+                prompt=optimized_prompt,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+            
+            image_url = response.data[0].url
+            
+            # Download prompt image to get base64
+            import requests
+            img_response = requests.get(image_url)
+            base64_image = base64.b64encode(img_response.content).decode('utf-8')
+            
+            return {
+                "success": True,
+                "image_data": base64_image,
+                "concept": concept,
+                "context_used": context,
+                "prompt_used": optimized_prompt,
+                "note": "Image generated with OpenAI DALL-E 3 (Fallback)"
+            }
+        except Exception as openai_error:
+            raise HTTPException(status_code=500, detail=f"Image generation failed: {str(openai_error)}")

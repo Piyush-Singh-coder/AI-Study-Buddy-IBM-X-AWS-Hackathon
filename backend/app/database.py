@@ -8,7 +8,13 @@ from app.core.config import settings
 # We will use standard sqlalchemy sync engine for metadata management
 # and let LangChain handle its own vector store connection string.
 
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,  # Checks connection liveness before use
+    pool_recycle=300,    # Recycle connections every 5 minutes
+    pool_size=10,
+    max_overflow=20
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

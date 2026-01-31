@@ -43,7 +43,7 @@ def get_active_models():
             },
             "teacher_brain": {
                 "name": "AI Teacher (Reasoning + TTS)",
-                "provider": "AWS Bedrock + openai",
+                "provider": "AWS Bedrock",
                 "model_id": settings.BEDROCK_TEXT_MODEL,
                 "description": "Powers the AI Teacher's explanations with analogies and examples. Synthesizes natural-sounding speech for the AI Teacher's responses."
             },

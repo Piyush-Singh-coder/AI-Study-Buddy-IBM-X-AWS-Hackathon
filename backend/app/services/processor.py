@@ -9,11 +9,12 @@ import openai
 from fastapi import UploadFile
 from app.core.config import settings
 import yt_dlp
+from urllib.parse import urlparse, parse_qs
 
 try:
-    from pypdf import PdfReader
+    pass # Removed unused import
 except ImportError:
-    PdfReader = None
+    pass
 
 
 class ProcessorService:
@@ -82,9 +83,12 @@ class ProcessorService:
             return f"[Skipped unsupported file: {filename}]", {}
 
     def process_pdf(self, file_stream, filename: str) -> tuple[str, dict]:
-        """Process PDF and return text with page numbers embedded."""
-        if not PdfReader:
-            return "Error: pypdf not installed.", {}
+        # Need to re-import PdfReader locally or ensure global availability if checking existence
+        try:
+             from pypdf import PdfReader
+        except ImportError:
+             return "Error: pypdf not installed.", {}
+
         try:
             reader = PdfReader(file_stream)
             text_with_pages = ""
@@ -213,19 +217,34 @@ class ProcessorService:
                     return text
                     
                 elif job_status == 'FAILED':
-                    return f"Transcription failed: {status['TranscriptionJob'].get('FailureReason', 'Unknown error')}"
+                    failure_reason = status['TranscriptionJob'].get('FailureReason', 'Unknown error')
+                    print(f"AWS Transcribe Failed: {failure_reason}. Falling back to OpenAI...")
+                    return self._transcribe_audio_direct(audio_bytes, filename)
                 
                 time.sleep(1)
             
-            return "Transcription timeout - audio too long or service busy."
+            print("AWS Transcribe timeout. Falling back to OpenAI...")
+            return self._transcribe_audio_direct(audio_bytes, filename)
             
         except Exception as e:
-            return f"Error transcribing audio: {str(e)}"
+            print(f"AWS Transcribe Error: {e}. Falling back to OpenAI...")
+            return self._transcribe_audio_direct(audio_bytes, filename)
 
-    def _transcribe_audio_direct(self, audio_bytes: bytes) -> str:
-        """Fallback: Direct transcription without S3 (limited support)."""
-        # This is a placeholder - AWS Transcribe typically requires S3
-        return "Audio transcription requires S3 bucket setup. Please contact support."
+    def _transcribe_audio_direct(self, audio_bytes: bytes, filename: str) -> str:
+        """Fallback: Direct transcription using OpenAI Whisper."""
+        try:
+            # OpenAI requires a file-like object with a name
+            audio_file = BytesIO(audio_bytes)
+            audio_file.name = filename
+            
+            transcript = self.openai_client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file,
+                response_format="text"
+            )
+            return transcript
+        except Exception as e:
+            return f"Error transcribing with OpenAI: {str(e)}"
 
     def process_youtube(self, url: str) -> tuple[str, dict]:
         """Process YouTube video and return transcript with metadata."""

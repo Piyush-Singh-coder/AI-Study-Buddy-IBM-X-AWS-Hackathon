@@ -29,6 +29,8 @@ def process_documents_background(files_data: list, youtube_url: str, session_id:
             if text and not text.startswith("Error"):
                 rag.add_document(text, metadata)
                 processed_count += 1
+            else:
+                print(f"YouTube processing returned error: {text}")
         except Exception as e:
             print(f"Error processing YouTube: {e}")
     

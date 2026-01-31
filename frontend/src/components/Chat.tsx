@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, FileText } from "lucide-react";
 import { chat } from "../services/api";
 
@@ -12,6 +12,15 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +55,7 @@ const Chat = () => {
         },
       ]);
     } catch (err) {
+      console.error("Chat Error:", err);
       setMessages((prev) => [
         ...prev,
         {
@@ -143,6 +153,7 @@ const Chat = () => {
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
         {loading && (
           <div className="flex justify-start">
             <div className="bg-white p-4 border-2 border-black shadow-neo-sm">

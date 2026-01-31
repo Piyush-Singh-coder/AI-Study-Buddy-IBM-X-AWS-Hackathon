@@ -59,7 +59,7 @@ const Home = () => {
         return;
       }
       await uploadFiles(files, youtubeUrl, sessionId);
-      navigate("/dashboard", { state: { fromUpload: true } });
+      navigate("/dashboard");
     } catch (err) {
       console.error(err);
       const errorMessage =
@@ -156,7 +156,7 @@ const Home = () => {
           <div className="inline-flex items-center space-x-2 bg-white border-2 border-black px-4 py-2 mb-6 shadow-neo-sm">
             <Sparkles size={20} className="text-neo-purple" />
             <span className="font-bold text-sm uppercase">
-              Powered by AWS Bedrock & IBM Granite
+              Powered by AWS 
             </span>
           </div>
 

@@ -98,7 +98,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ sessionId }) => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-2 border-black shadow-neo font-sans">
+    <div className="flex flex-col bg-white border-2 border-black shadow-neo font-sans">
       {/* Header */}
       <div className="p-6 border-b-2 border-black bg-neo-pink text-white">
         <div className="flex items-center gap-3 mb-4">
@@ -191,7 +191,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ sessionId }) => {
       </div>
 
       {/* Result Area */}
-      <div className="flex-1 overflow-auto p-6 bg-white pattern-dots">
+      <div className="p-6 bg-white pattern-dots">
         {error && (
           <div className="bg-neo-red border-2 border-black text-white p-4 mb-4 flex items-start gap-3 shadow-neo-sm">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 stroke-2" />

@@ -62,7 +62,7 @@ const SamplePaper = () => {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-6 font-sans">
+    <div className="flex flex-col space-y-6 font-sans">
       <div className="bg-neo-blue border-2 border-black p-8 text-white shadow-neo">
         <h2 className="text-3xl font-black mb-2 uppercase text-stroke-sm drop-shadow-[2px_2px_0px_black]">
           Sample Paper Generator
@@ -140,7 +140,7 @@ const SamplePaper = () => {
 
       {/* Result Area */}
       {paperData && (
-        <div className="flex-1 bg-white p-8 border-2 border-black shadow-neo overflow-y-auto">
+        <div className="bg-white p-8 border-2 border-black shadow-neo">
           <div className="flex justify-between items-center mb-6 border-b-2 border-black pb-4">
             <div>
               <h3 className="text-2xl font-black text-black uppercase">
