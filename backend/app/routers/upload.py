@@ -2,6 +2,8 @@ from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
 from typing import List
 from app.services.processor import ProcessorService
 from app.services.rag_service import RAGService
+from app.database import SessionLocal
+from app.models import StudySession
 
 router = APIRouter()
 
@@ -11,6 +13,22 @@ def process_documents_background(files_data: list, youtube_url: str, session_id:
     rag = RAGService(session_id=session_id)
     
     processed_count = 0
+    
+    # Auto-name the session based on the first upload
+    db = SessionLocal()
+    try:
+        session_record = db.query(StudySession).filter(StudySession.id == session_id).first()
+        if session_record and session_record.title == "New Session":
+            if files_data:
+                session_record.title = files_data[0][1]  # The filename
+            elif youtube_url:
+                session_record.title = "YouTube Video"
+            db.commit()
+    except Exception as e:
+        print(f"Error renaming session: {e}")
+    finally:
+        db.close()
+
     
     # Process files
     for file_content, filename, content_type in files_data:

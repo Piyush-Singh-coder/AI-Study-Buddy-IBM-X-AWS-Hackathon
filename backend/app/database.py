@@ -11,7 +11,7 @@ from app.core.config import settings
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,  # Checks connection liveness before use
-    pool_recycle=300,    # Recycle connections every 5 minutes
+    pool_recycle=240,    # Recycle connections every 4 minutes (safe under 5m timeout)
     pool_size=10,
     max_overflow=20
 )
@@ -27,4 +27,5 @@ def get_db():
         db.close()
 
 def create_db_and_tables():
+    from app.models import StudySession # Import models to register with Base
     Base.metadata.create_all(bind=engine)

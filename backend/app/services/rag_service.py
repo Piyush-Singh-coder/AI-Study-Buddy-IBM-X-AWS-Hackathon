@@ -1,45 +1,26 @@
-from langchain_aws import ChatBedrock, BedrockEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_postgres import PGVector
-from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 from app.core.config import settings
 import json
 import re
-import boto3
+
 
 class RAGService:
     def __init__(self, session_id: str = None):
         self.session_id = session_id
         
-        # Initialize Bedrock client
-        self.bedrock_client = boto3.client(
-            "bedrock-runtime",
-            region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+        # OpenAI LLM (GPT-4o)
+        self.llm = ChatOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            model=settings.OPENAI_TEXT_MODEL,
+            temperature=0.3
         )
         
-        # Use Bedrock Embeddings (Titan)
-        self.embeddings = BedrockEmbeddings(
-            client=self.bedrock_client,
-            model_id=settings.BEDROCK_EMBEDDING_MODEL
-        )
-        
-        # Use Bedrock LLM (Nova Pro)
-        self.llm = ChatBedrock(
-            client=self.bedrock_client,
-            model_id=settings.BEDROCK_TEXT_MODEL,
-            model_kwargs={"temperature": 0.3}
-        )
-        
-        # Use IBM Granite (via Bedrock) for Quiz Generation
-        self.granite_llm = ChatBedrock(
-            client=self.bedrock_client,
-            model_id=settings.IBM_GRANITE_MODEL,
-            model_kwargs={"temperature": 0.3}
+        # OpenAI Embeddings (text-embedding-3-small, 1536 dims)
+        self.embeddings = OpenAIEmbeddings(
+            api_key=settings.OPENAI_API_KEY,
+            model=settings.OPENAI_EMBEDDING_MODEL
         )
         
         self.connection_string = settings.DATABASE_URL
@@ -51,22 +32,17 @@ class RAGService:
             connection=self.connection_string,
             use_jsonb=True,
         )
-        # self.ensure_index() # Call this to optimize speed
-
 
     def ensure_index(self):
         """Creates HNSW index for faster retrieval."""
         try:
-            from sqlalchemy import create_engine, text
-            engine = create_engine(self.connection_string)
+            from sqlalchemy import text
+            from app.database import engine
             with engine.connect() as conn:
-                # Check if index exists, if not create it
-                # Using HNSW for speed (approximate) vs IVFFlat (exact)
                 conn.execute(text("CREATE INDEX IF NOT EXISTS embedding_hnsw ON langchain_pg_embedding USING hnsw (embedding vector_cosine_ops)"))
                 conn.commit()
         except Exception as e:
             print(f"Index optimization skipped: {e}")
-
 
     def add_document(self, text: str, metadata: dict = None):
         """Splits text and adds to vector store with session_id."""
@@ -82,7 +58,7 @@ class RAGService:
         
         metadatas = [base_metadata.copy() for _ in texts]
         
-        # Batch insertions to avoid hitting DB packet limits (specifically for large PDFs)
+        # Batch insertions to avoid hitting DB packet limits
         batch_size = 50
         total_added = 0
         
@@ -99,8 +75,8 @@ class RAGService:
 
     def delete_session_documents(self, session_id: str) -> int:
         try:
-            from sqlalchemy import create_engine, text
-            engine = create_engine(self.connection_string)
+            from sqlalchemy import text
+            from app.database import engine
             with engine.connect() as conn:
                 result = conn.execute(
                     text("DELETE FROM langchain_pg_embedding WHERE cmetadata->>'session_id' = :sid"),
@@ -114,8 +90,8 @@ class RAGService:
 
     def get_session_documents_list(self) -> list:
         try:
-            from sqlalchemy import create_engine, text
-            engine = create_engine(self.connection_string)
+            from sqlalchemy import text
+            from app.database import engine
             with engine.connect() as conn:
                 result = conn.execute(
                     text("SELECT DISTINCT cmetadata->>'source' as source FROM langchain_pg_embedding WHERE cmetadata->>'session_id' = :sid"),
@@ -137,7 +113,6 @@ class RAGService:
             metadata = doc.metadata or {}
             source = metadata.get('source', 'Unknown')
             
-            # Extract page number from content if present
             page_match = re.search(r'\[Page (\d+) of (\d+)\]', content)
             if page_match:
                 page_num = page_match.group(1)
@@ -150,7 +125,7 @@ class RAGService:
         
         return "\n\n".join(formatted), list(set(sources))
 
-    def _get_session_retriever(self, k: int = 15, source_filter: str = None): # Increased k for better recall
+    def _get_session_retriever(self, k: int = 15, source_filter: str = None):
         filter_dict = {}
         if self.session_id:
             filter_dict["session_id"] = self.session_id
@@ -176,7 +151,6 @@ class RAGService:
         
         context, sources = self._format_docs_with_sources(docs)
         
-        # More balanced prompt - strict on facts but flexible on phrasing
         system_prompt = """You are a helpful study assistant. Answer the question based on the provided context.
 
 Context from uploaded documents:
@@ -189,7 +163,6 @@ Instructions:
 4. If the context definitely does not contain the answer, state that you don't have that information.
 5. Do not hallucinate or fix gaps with outside knowledge.
 """
-
         messages = [
             {"role": "system", "content": system_prompt.format(context=context)},
             {"role": "user", "content": query}
@@ -208,7 +181,7 @@ Instructions:
             
         prompt_style = "Provide a comprehensive summary (approx 300 words) capturing all key ideas, important facts, and conclusions. Do not be too brief." if summary_type == "brief" else "Provide a comprehensive, detailed study note with bullet points, key definitions, important dates, formulas, and arguments. Do NOT leave out any important details."
         
-        prompt = f"{prompt_style}\n\nContext:\n{text_context[:25000]}" # Increased limit for detailed
+        prompt = f"{prompt_style}\n\nContext:\n{text_context[:25000]}"
         messages = [{"role": "user", "content": prompt}]
         response = self.llm.invoke(messages)
         return response.content
@@ -219,10 +192,7 @@ Instructions:
         if source_filter and source_filter != "all":
             query = f"Summarize the content from {source_filter}: {query}"
         
-        # INCREASED K for detailed summary to capture more context
         k_val = 20 if summary_type == "brief" else 100
-        
-        # Use filtered retriever
         retriever = self._get_session_retriever(k=k_val, source_filter=source_filter)
         docs = retriever.invoke(query)
         
@@ -231,7 +201,6 @@ Instructions:
 
         context, sources = self._format_docs_with_sources(docs)
         
-        # Enhanced Prompt for Detailed Summary
         if summary_type == "detailed":
             prompt = f"""You are an expert academic tutor creating a DETAILED STUDY GUIDE.
             
@@ -261,14 +230,12 @@ Instructions:
 2. Write a clear, multi-paragraph summary (approx 300 words) that covers the main narrative and key points.
 3. If the context is limited, summarize what is available.
 """
-
         messages = [{"role": "user", "content": prompt}]
         response = self.llm.invoke(messages)
         return response.content
 
     def get_context_for_quiz(self, topic: str) -> tuple[str, int]:
         retriever = self._get_session_retriever(k=20)
-        
         search_query = f"Key concepts and important information about {topic}" if topic != "general" else "Main concepts, key facts, and important information"
         docs = retriever.invoke(search_query)
         
@@ -317,9 +284,7 @@ Instructions:
 - Return as JSON list with keys: 'question', 'options' (4 strings), 'answer' (correct option), 'topic' (brief topic)
 - No markdown, just raw JSON
 """
-        
         messages = [{"role": "user", "content": prompt}]
-        # Using Nova Pro (IBM Granite not enabled in Bedrock account)
         response = self.llm.invoke(messages)
         content = response.content.replace("```json", "").replace("```", "").strip()
         
@@ -370,7 +335,7 @@ Provide a brief, encouraging study recommendation (2-3 sentences) focusing on th
         try:
             response = self.llm.invoke([{"role": "user", "content": recommendation_prompt}])
             recommendation = response.content
-        except:
+        except Exception:
             recommendation = f"Focus on reviewing: {', '.join(weak_topic_list)}"
         
         return {
@@ -457,10 +422,7 @@ Instructions:
         return {"paper": paper_structure, "original_pattern": pyq_pattern}
 
     async def generate_slide_content(self, topic: str, num_slides: int = 5) -> list[dict]:
-        """
-        Generates structured content for slides including title, bullets, and speaker notes.
-        """
-        # Get context (use broader search for presentation)
+        """Generates structured content for slides."""
         context, _ = self.get_context_for_quiz(topic)
         
         prompt = f"""Create content for a {num_slides}-slide PowerPoint presentation about "{topic}".
@@ -469,7 +431,7 @@ Instructions:
         {context[:15000]}
         
         Instructions:
-        1. Generate exactly {num_slides} slides (plus a title slide implied, do not count the title slide in the list)
+        1. Generate exactly {num_slides} slides
         2. For each slide provide:
            - "title": Short, catchy title
            - "points": List of 3-5 clear bullet points
@@ -490,16 +452,13 @@ Instructions:
         """
         
         messages = [{"role": "user", "content": prompt}]
-        
-        # Use Nova Pro for high quality content
         response = self.llm.invoke(messages)
         content = response.content.replace("```json", "").replace("```", "").strip()
         
         try:
             slides_data = json.loads(content)
             return slides_data
-        except:
-            # Fallback if JSON fails
+        except Exception:
             return []
 
     def teacher_chat(self, query: str, language: str = "English") -> dict:
@@ -532,16 +491,12 @@ Instructions:
 
 Structure your response to be spoken naturally.
 """
-
         messages = [
             {"role": "system", "content": system_prompt.format(context=context, language=language)},
             {"role": "user", "content": query}
         ]
         
-        # Slightly higher temp for better analogies
-        self.llm.temperature = 0.5 
         response = self.llm.invoke(messages)
-        self.llm.temperature = 0.3 # Reset
         
         return {
             "response": response.content,

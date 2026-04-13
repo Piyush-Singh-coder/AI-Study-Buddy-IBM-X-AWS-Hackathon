@@ -1,14 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from app.routers import session, upload, quiz, chat, audio, image, slides, models
 from app.database import create_db_and_tables
+import os
 
 app = FastAPI(title="AI Study Buddy API")
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=["*"],  # Allow all origins for ngrok demo
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,6 +32,27 @@ app.include_router(image.router, prefix="/api/image", tags=["Image"])
 app.include_router(slides.router, prefix="/api/slides", tags=["Slides"])
 app.include_router(models.router, prefix="/api/models", tags=["Models"])
 
-@app.get("/")
-def read_root():
-    return {"message": "AI Study Buddy API is running"}
+# Serve React frontend build
+FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+
+if os.path.exists(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+
+    @app.get("/")
+    def serve_root():
+        with open(os.path.join(FRONTEND_DIST, "index.html")) as f:
+            return HTMLResponse(content=f.read())
+
+    # Catch-all for React Router (client-side routing)
+    @app.get("/{full_path:path}")
+    def serve_spa(full_path: str):
+        # Don't intercept /api routes
+        if full_path.startswith("api"):
+            return {"detail": "Not found"}
+        index_path = os.path.join(FRONTEND_DIST, "index.html")
+        with open(index_path) as f:
+            return HTMLResponse(content=f.read())
+else:
+    @app.get("/")
+    def read_root():
+        return {"message": "AI Study Buddy API is running. Build the frontend first."}
