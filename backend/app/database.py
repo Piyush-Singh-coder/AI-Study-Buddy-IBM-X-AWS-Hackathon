@@ -27,5 +27,5 @@ def get_db():
         db.close()
 
 def create_db_and_tables():
-    from app.models import StudySession # Import models to register with Base
+    from app.models import User, StudySession # Import models to register with Base
     Base.metadata.create_all(bind=engine)

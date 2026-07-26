@@ -32,8 +32,15 @@ def create_session(
         user_id=effective_user_id,
         title="New Session"
     )
-    db.add(new_session)
-    db.commit()
+    try:
+        db.add(new_session)
+        db.commit()
+    except Exception:
+        db.rollback()
+        from app.database import create_db_and_tables
+        create_db_and_tables()
+        db.add(new_session)
+        db.commit()
     
     return {"session_id": session_id, "message": "Session created successfully"}
 
