@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
-from typing import List
+from typing import List, Optional
 from app.services.processor import ProcessorService
 from app.services.rag_service import RAGService
 from app.database import SessionLocal
@@ -7,7 +7,7 @@ from app.models import StudySession
 
 router = APIRouter()
 
-def process_documents_background(files_data: list, youtube_url: str, session_id: str):
+def process_documents_background(files_data: list, session_id: str):
     """Background task to process documents without blocking the response."""
     processor = ProcessorService()
     rag = RAGService(session_id=session_id)
@@ -21,15 +21,12 @@ def process_documents_background(files_data: list, youtube_url: str, session_id:
         if session_record and session_record.title == "New Session":
             if files_data:
                 session_record.title = files_data[0][1]  # The filename
-            elif youtube_url:
-                session_record.title = "YouTube Video"
             db.commit()
     except Exception as e:
         print(f"Error renaming session: {e}")
     finally:
         db.close()
 
-    
     # Process files
     for file_content, filename, content_type in files_data:
         try:
@@ -40,18 +37,6 @@ def process_documents_background(files_data: list, youtube_url: str, session_id:
         except Exception as e:
             print(f"Error processing {filename}: {e}")
     
-    # Process YouTube URL
-    if youtube_url:
-        try:
-            text, metadata = processor.process_youtube(youtube_url)
-            if text and not text.startswith("Error"):
-                rag.add_document(text, metadata)
-                processed_count += 1
-            else:
-                print(f"YouTube processing returned error: {text}")
-        except Exception as e:
-            print(f"Error processing YouTube: {e}")
-    
     print(f"Background processing complete: {processed_count} files for session {session_id}")
 
 
@@ -59,12 +44,9 @@ def process_documents_background(files_data: list, youtube_url: str, session_id:
 async def upload_files(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(None),
-    youtube_url: str = Form(None),
     session_id: str = Form(...)
 ):
     """Upload files - returns immediately while processing happens in background."""
-    
-    # Read file contents immediately (before response returns)
     files_data = []
     if files:
         for file in files:
@@ -75,11 +57,10 @@ async def upload_files(
     background_tasks.add_task(
         process_documents_background, 
         files_data, 
-        youtube_url, 
         session_id
     )
     
-    file_count = len(files_data) + (1 if youtube_url else 0)
+    file_count = len(files_data)
     
     return {
         "message": f"Processing {file_count} file(s) in background. You can start using features!",

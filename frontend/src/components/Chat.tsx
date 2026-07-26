@@ -195,9 +195,9 @@ const Chat = () => {
 
       {/* Model Badge */}
       <div className="bg-black text-white p-1 text-center border-t-2 border-white">
-        <p className="text-[10px] font-bold uppercase tracking-widest">
-          Powered by AWS Bedrock (Amazon Nova Pro)
-        </p>
+        <div className="p-3 text-center text-xs text-gray-500 font-mono tracking-wider border-t-2 border-black bg-white">
+          Powered by OpenAI (GPT-4o)
+        </div>
       </div>
     </div>
   );

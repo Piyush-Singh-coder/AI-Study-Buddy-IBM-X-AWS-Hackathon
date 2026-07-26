@@ -150,9 +150,9 @@ const SlidesGenerator: React.FC<SlidesGeneratorProps> = ({ sessionId }) => {
           </div>
 
           <div className="mt-8 text-center">
-            <p className="font-bold text-gray-500 uppercase text-sm">
-              POWERED BY AWS BEDROCK (AMAZON NOVA PRO) & PYTHON-PPTX
-            </p>
+            <div className="text-center text-xs text-gray-500 font-bold tracking-widest mt-6 pb-2">
+              POWERED BY OPENAI (GPT-4o) & PYTHON-PPTX
+            </div>
           </div>
         </div>
       </div>

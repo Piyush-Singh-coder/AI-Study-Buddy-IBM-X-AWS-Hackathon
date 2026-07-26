@@ -248,7 +248,6 @@ const Teacher = () => {
       }
 
       setMessages((prev) => {
-        const newIdx = prev.length + 1; // +1 because we are adding now
         // Using setTimeout to play next audio automatically after render
         setTimeout(() => setCurrentAudioIndex(prev.length), 100);
         return [
@@ -433,9 +432,9 @@ const Teacher = () => {
         )}
       </div>
       <div className="bg-black text-white p-1 text-center border-t-2 border-white">
-        <p className="text-[10px] font-bold uppercase tracking-widest">
-          Powered by AWS Transcribe & OpenAI TTS (AI Teacher)
-        </p>
+        <div className="p-3 bg-white border-t-2 border-black text-center text-xs font-bold text-gray-500 tracking-widest uppercase">
+          Powered by OpenAI (Whisper, GPT-4o, TTS)
+        </div>
       </div>
     </div>
   );

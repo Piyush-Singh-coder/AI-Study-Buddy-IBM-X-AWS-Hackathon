@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { UserButton } from "@clerk/clerk-react";
-import toast, { Toaster } from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 import {
   MessageSquare,
   FileText,
@@ -21,9 +20,8 @@ import Teacher from "../components/Teacher";
 import ImageGenerator from "../components/ImageGenerator";
 import SlidesGenerator from "../components/SlidesGenerator";
 import ModelInfo from "../components/ModelInfo";
-import PaywallWrapper from "../components/PaywallWrapper";
 import { useNavigate, useLocation } from "react-router-dom";
-import { deleteSession, getSessionDocuments } from "../services/api";
+import { deleteSession, getSessionHistory } from "../services/api";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<
@@ -39,66 +37,33 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [sessionHistory, setSessionHistory] = useState<any[]>([]);
+  const currentSessionId = localStorage.getItem("study_session_id");
 
-  // Polling for processing completion if coming from upload
   useEffect(() => {
-    if (location.state?.fromUpload) {
-      const sessionId = localStorage.getItem("study_session_id");
-      if (!sessionId) return;
+    const fetchHistory = async () => {
+      try {
+        const history = await getSessionHistory();
+        setSessionHistory(history);
+      } catch (e) {
+        console.error("Failed to fetch history", e);
+      }
+    };
+    fetchHistory();
+  }, []);
 
-      const toastId = toast.loading("Processing your documents...", {
-        position: "top-center",
-        style: {
-          border: "2px solid black",
-          padding: "16px",
-          color: "#000",
-          fontWeight: "bold",
-          background: "#FEF08A", // Neo-yellow
-        },
-      });
-
-      const checkStatus = async () => {
-        try {
-          const data = await getSessionDocuments(sessionId);
-          if (data && data.documents && data.documents.length > 0) {
-            toast.dismiss(toastId);
-            toast.success("Documents processed successfully!", {
-              duration: 5000,
-              position: "top-center",
-              style: {
-                border: "2px solid black",
-                padding: "16px",
-                color: "#fff",
-                fontWeight: "bold",
-                background: "#0FB5AE", // Neo-blue/green
-              },
-            });
-            // Clear state so we don't poll again on reload
-            window.history.replaceState({}, document.title);
-            return true; // Stop polling
-          }
-        } catch (e) {
-          console.error("Polling error", e);
-        }
-        return false;
-      };
-
-      const interval = setInterval(async () => {
-        const done = await checkStatus();
-        if (done) clearInterval(interval);
-      }, 5000); // Increased to 5s to reduce log spam
-
-      // Timeout after 60s
-      setTimeout(() => {
-        clearInterval(interval);
-        toast.dismiss(toastId);
-      }, 60000);
-
-      return () => {
-        clearInterval(interval);
-        toast.dismiss(toastId); // Dismiss toast if user leaves page
-      };
-    }
+  // Dashboard content is ready because Home page waits for RAG creation
+  useEffect(() => {
+    // Quick check to update sessions list if needed
+    const fetchHistory = async () => {
+      try {
+        const history = await getSessionHistory();
+        setSessionHistory(history);
+      } catch (e) {
+        console.error("Failed to fetch history", e);
+      }
+    };
+    fetchHistory();
   }, [location.state]);
 
   const handleEndSession = async () => {
@@ -106,12 +71,18 @@ const Dashboard = () => {
     if (sessionId) {
       try {
         await deleteSession(sessionId);
+        setSessionHistory((prev) => prev.filter((s) => s.id !== sessionId));
       } catch (err) {
         console.error("Failed to delete session:", err);
       }
       localStorage.removeItem("study_session_id");
     }
     navigate("/");
+  };
+
+  const switchSession = (sessionId: string) => {
+    localStorage.setItem("study_session_id", sessionId);
+    window.location.reload(); // Quick way to reset all states and components
   };
 
   return (
@@ -135,84 +106,108 @@ const Dashboard = () => {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 space-y-3 mt-6">
-          <SidebarItem
-            icon={<FileText size={20} />}
-            label="SUMMARY"
-            isActive={activeTab === "summary"}
-            onClick={() => setActiveTab("summary")}
-            isOpen={isSidebarOpen}
-            color="bg-neo-blue"
-          />
-          <SidebarItem
-            icon={<CheckSquare size={20} />}
-            label="QUIZ"
-            isActive={activeTab === "quiz"}
-            onClick={() => setActiveTab("quiz")}
-            isOpen={isSidebarOpen}
-            color="bg-neo-green"
-          />
-          <SidebarItem
-            icon={<MessageSquare size={20} />}
-            label="CHAT"
-            isActive={activeTab === "chat"}
-            onClick={() => setActiveTab("chat")}
-            isOpen={isSidebarOpen}
-            color="bg-neo-yellow"
-          />
-          <SidebarItem
-            icon={<Presentation size={20} />}
-            label="SLIDES"
-            isActive={activeTab === "slides"}
-            onClick={() => setActiveTab("slides")}
-            isOpen={isSidebarOpen}
-            color="bg-neo-blue"
-          />
-          <SidebarItem
-            icon={<Files size={20} />}
-            label="SAMPLE PAPER"
-            isActive={activeTab === "sample_paper"}
-            onClick={() => setActiveTab("sample_paper")}
-            isOpen={isSidebarOpen}
-            color="bg-neo-pink"
-            isPro={true}
-          />
-          <SidebarItem
-            icon={<Volume2 size={20} />}
-            label="AI TEACHER"
-            isActive={activeTab === "teacher"}
-            onClick={() => setActiveTab("teacher")}
-            isOpen={isSidebarOpen}
-            color="bg-neo-purple"
-            isPro={true}
-          />
-          <SidebarItem
-            icon={<Image size={20} />}
-            label="IMAGE GEN"
-            isActive={activeTab === "image"}
-            onClick={() => setActiveTab("image")}
-            isOpen={isSidebarOpen}
-            color="bg-neo-red"
-            isPro={true}
-          />
-        </nav>
+        {/* Scrollable middle section */}
+        <div className="flex-1 overflow-y-auto">
+          <nav className="px-4 space-y-3 mt-6">
+            <SidebarItem
+              icon={<FileText size={20} />}
+              label="SUMMARY"
+              isActive={activeTab === "summary"}
+              onClick={() => setActiveTab("summary")}
+              isOpen={isSidebarOpen}
+              color="bg-neo-blue"
+            />
+            <SidebarItem
+              icon={<CheckSquare size={20} />}
+              label="QUIZ"
+              isActive={activeTab === "quiz"}
+              onClick={() => setActiveTab("quiz")}
+              isOpen={isSidebarOpen}
+              color="bg-neo-green"
+            />
+            <SidebarItem
+              icon={<MessageSquare size={20} />}
+              label="CHAT"
+              isActive={activeTab === "chat"}
+              onClick={() => setActiveTab("chat")}
+              isOpen={isSidebarOpen}
+              color="bg-neo-yellow"
+            />
+            <SidebarItem
+              icon={<Presentation size={20} />}
+              label="SLIDES"
+              isActive={activeTab === "slides"}
+              onClick={() => setActiveTab("slides")}
+              isOpen={isSidebarOpen}
+              color="bg-neo-blue"
+            />
+            <SidebarItem
+              icon={<Files size={20} />}
+              label="SAMPLE PAPER"
+              isActive={activeTab === "sample_paper"}
+              onClick={() => setActiveTab("sample_paper")}
+              isOpen={isSidebarOpen}
+              color="bg-neo-pink"
+            />
+            <SidebarItem
+              icon={<Volume2 size={20} />}
+              label="AI TEACHER"
+              isActive={activeTab === "teacher"}
+              onClick={() => setActiveTab("teacher")}
+              isOpen={isSidebarOpen}
+              color="bg-neo-purple"
+            />
+            <SidebarItem
+              icon={<Image size={20} />}
+              label="IMAGE GEN"
+              isActive={activeTab === "image"}
+              onClick={() => setActiveTab("image")}
+              isOpen={isSidebarOpen}
+              color="bg-neo-red"
+            />
+          </nav>
 
-        <div className="p-4 border-t-4 border-black space-y-3 bg-gray-50">
+          <div className="mt-4 pt-4 border-t-4 border-black px-4 mb-4">
+            {isSidebarOpen && (
+              <h3 className="text-xs font-black text-gray-500 mb-2 tracking-widest">
+                YOUR SESSIONS
+              </h3>
+            )}
+            <div className="space-y-2 pr-1">
+              {sessionHistory.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => switchSession(session.id)}
+                  className={`w-full text-left truncate text-sm px-2 py-2 border border-black hover:bg-gray-100 transition-colors shadow-neo-sm hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] ${
+                    currentSessionId === session.id
+                      ? "font-black bg-neo-yellow"
+                      : "bg-white"
+                  }`}
+                  title={session.title}
+                >
+                  {isSidebarOpen ? session.title : "•"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t-4 border-black space-y-3 bg-gray-50 mt-auto">
           <div
             className={`flex items-center ${isSidebarOpen ? "justify-between" : "justify-center"} gap-2`}
           >
             <button
-              onClick={() => navigate("/")}
+              onClick={() => {
+                localStorage.removeItem("study_session_id");
+                navigate("/");
+              }}
               className={`flex items-center space-x-3 flex-1 p-3 font-bold border-2 border-black bg-white shadow-neo-sm hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all text-black ${!isSidebarOpen && "justify-center"}`}
             >
               <Plus size={20} className="stroke-2" />
               {isSidebarOpen && (
-                <span className="uppercase text-sm">Add Docs</span>
+                <span className="uppercase text-sm">New Session</span>
               )}
             </button>
-            <div className="p-2 bg-white border-2 border-black shadow-neo-sm">
-              <UserButton afterSignOutUrl="/" />
-            </div>
           </div>
           <button
             onClick={handleEndSession}
@@ -220,7 +215,7 @@ const Dashboard = () => {
           >
             <LogOut size={20} className="stroke-2" />
             {isSidebarOpen && (
-              <span className="uppercase text-sm">End Session</span>
+              <span className="uppercase text-sm">Delete Session</span>
             )}
           </button>
         </div>
@@ -257,12 +252,7 @@ const Dashboard = () => {
                   }}
                   className="h-full"
                 >
-                  <PaywallWrapper
-                    feature="sample_paper"
-                    featureLabel="Sample Paper Generator"
-                  >
-                    <SamplePaper />
-                  </PaywallWrapper>
+                  <SamplePaper />
                 </div>
                 <div
                   style={{
@@ -270,22 +260,15 @@ const Dashboard = () => {
                   }}
                   className="h-full"
                 >
-                  <PaywallWrapper feature="teacher" featureLabel="AI Teacher">
-                    <Teacher />
-                  </PaywallWrapper>
+                  <Teacher />
                 </div>
                 <div
                   style={{ display: activeTab === "image" ? "block" : "none" }}
                   className="h-full"
                 >
-                  <PaywallWrapper
-                    feature="image"
-                    featureLabel="Image Generator"
-                  >
-                    <ImageGenerator
-                      sessionId={localStorage.getItem("study_session_id") || ""}
-                    />
-                  </PaywallWrapper>
+                  <ImageGenerator
+                    sessionId={localStorage.getItem("study_session_id") || ""}
+                  />
                 </div>
                 <div
                   style={{ display: activeTab === "slides" ? "block" : "none" }}
@@ -315,7 +298,6 @@ const SidebarItem = ({
   onClick,
   isOpen,
   color,
-  isPro = false,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -323,7 +305,6 @@ const SidebarItem = ({
   onClick: () => void;
   isOpen: boolean;
   color: string;
-  isPro?: boolean;
 }) => (
   <button
     onClick={onClick}
@@ -335,16 +316,7 @@ const SidebarItem = ({
   >
     <div className={`${!isActive && "text-black"}`}>{icon}</div>
     {isOpen && (
-      <div className="flex items-center space-x-2 flex-1">
-        <span className="font-bold text-sm tracking-wide">{label}</span>
-        {isPro && (
-          <span
-            className={`text-[10px] font-black px-1.5 py-0.5 border border-black ${isActive ? "bg-neo-yellow text-black" : "bg-neo-yellow text-black"}`}
-          >
-            PRO
-          </span>
-        )}
-      </div>
+      <span className="font-bold text-sm tracking-wide">{label}</span>
     )}
   </button>
 );

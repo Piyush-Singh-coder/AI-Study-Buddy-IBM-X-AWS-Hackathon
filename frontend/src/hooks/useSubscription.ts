@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/clerk-react";
+import { useAuth } from "../context/AuthContext";
 
 export type SubscriptionPlan = "free" | "pro";
 
@@ -13,13 +13,9 @@ export interface SubscriptionStatus {
 const PRO_FEATURES = ["teacher", "image", "sample_paper"];
 
 export function useSubscription(): SubscriptionStatus {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuth();
 
-  // Check both publicMetadata (webhook-set) and unsafeMetadata (demo-set)
-  const metaPlan =
-    (user?.publicMetadata?.plan as string) ||
-    (user?.unsafeMetadata?.plan as string);
-
+  const metaPlan = user?.plan || "free";
   const isPro = metaPlan === "pro";
   const plan: SubscriptionPlan = isPro ? "pro" : "free";
 

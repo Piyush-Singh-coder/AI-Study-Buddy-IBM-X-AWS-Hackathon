@@ -9,11 +9,10 @@ import {
   Volume2,
   Presentation,
   Loader2,
+  MessageSquare
 } from "lucide-react";
 
-interface ModelInfoProps {
-  // No props needed
-}
+interface ModelInfoProps {}
 
 const ModelInfo: React.FC<ModelInfoProps> = () => {
   const [data, setData] = useState<any>(null);
@@ -36,30 +35,27 @@ const ModelInfo: React.FC<ModelInfoProps> = () => {
 
   if (!data) return <div>Error loading models</div>;
 
-  const features = data.features;
-  const region = data.region;
+  const features = data.features || {};
+  const provider = data.cloud_provider || "Gemini & NVIDIA AI";
 
   const getIcon = (key: string) => {
     switch (key) {
-      case "conversational_ai":
+      case "chat_rag":
         return <MessageSquare className="w-5 h-5" />;
       case "embeddings":
         return <Layers className="w-5 h-5" />;
       case "image_generation":
         return <Image className="w-5 h-5" />;
-      case "speech_recognition":
+      case "speech_to_text":
         return <Mic className="w-5 h-5" />;
       case "text_to_speech":
         return <Volume2 className="w-5 h-5" />;
-      case "slide_generation":
+      case "slides":
         return <Presentation className="w-5 h-5" />;
       default:
         return <Cpu className="w-5 h-5" />;
     }
   };
-
-  // Need to import MessageSquare locally or use lucide-react one
-  // I actually just used lucide-react above. Let me add MessageSquare to imports.
 
   return (
     <div className="h-full flex flex-col bg-white border-2 border-black shadow-neo font-sans">
@@ -74,7 +70,7 @@ const ModelInfo: React.FC<ModelInfoProps> = () => {
               System Status
             </h2>
             <p className="font-bold text-sm">
-              Active Models & Cloud Region: {region}
+              Active Provider: {provider}
             </p>
           </div>
         </div>
@@ -123,14 +119,13 @@ const ModelInfo: React.FC<ModelInfoProps> = () => {
         </div>
 
         <div className="mt-8 text-center">
-          <p className="font-bold text-gray-400 uppercase text-xs tracking-widest">
-            POWERED BY AWS BEDROCK
-          </p>
+          <div className="text-center text-xs font-bold text-gray-500 tracking-wider">
+            POWERED BY GOOGLE GEMINI & NVIDIA AI
+          </div>
         </div>
       </div>
     </div>
   );
 };
-import { MessageSquare } from "lucide-react"; // Import missing icon
 
 export default ModelInfo;

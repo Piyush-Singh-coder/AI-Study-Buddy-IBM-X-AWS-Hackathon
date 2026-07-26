@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { SignedIn, SignedOut, useUser } from "@clerk/clerk-react";
 import { ArrowLeft, Crown, Check, Sparkles, Loader2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import AuthModal from "../components/AuthModal";
 
 const PricingPage = () => {
-  const { user } = useUser();
+  const { user, upgradeToPro } = useAuth();
   const navigate = useNavigate();
   const [upgrading, setUpgrading] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const features = {
     free: [
@@ -25,19 +27,14 @@ const PricingPage = () => {
     ],
   };
 
-  // Demo upgrade function - sets unsafeMetadata for hackathon demo
   const handleDemoUpgrade = async () => {
-    if (!user) return;
+    if (!user) {
+      setAuthModalOpen(true);
+      return;
+    }
     setUpgrading(true);
     try {
-      await user.update({
-        unsafeMetadata: {
-          ...user.unsafeMetadata,
-          plan: "pro",
-          upgradedAt: new Date().toISOString(),
-        },
-      });
-      // Navigate back to dashboard after upgrade
+      upgradeToPro();
       navigate("/dashboard");
     } catch (error) {
       console.error("Upgrade failed:", error);
@@ -46,19 +43,18 @@ const PricingPage = () => {
     }
   };
 
-  const currentPlan =
-    (user?.unsafeMetadata?.plan as string) ||
-    (user?.publicMetadata?.plan as string) ||
-    "free";
+  const currentPlan = user?.plan || "free";
 
   return (
     <div className="min-h-screen bg-neo-yellow pattern-dots">
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+
       {/* Header */}
       <header className="bg-white border-b-4 border-black">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link
             to="/"
-            className="flex items-center space-x-2 font-bold hover:underline"
+            className="flex items-center space-x-2 font-bold hover:underline text-black"
           >
             <ArrowLeft size={20} />
             <span>Back to Home</span>
@@ -139,8 +135,8 @@ const PricingPage = () => {
               ))}
             </ul>
 
-            <SignedIn>
-              {currentPlan === "pro" ? (
+            {user ? (
+              currentPlan === "pro" ? (
                 <div className="text-center py-3 bg-white text-black border-2 border-black font-black">
                   ✓ Active Plan
                 </div>
@@ -159,33 +155,18 @@ const PricingPage = () => {
                     "Upgrade to Pro — Demo"
                   )}
                 </button>
-              )}
-            </SignedIn>
+              )
+            ) : (
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                className="w-full py-4 bg-neo-green text-black font-black uppercase border-4 border-black shadow-neo hover:shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+              >
+                Sign In to Upgrade
+              </button>
+            )}
           </div>
         </div>
       </section>
-
-      {/* Sign In Prompt for Signed Out Users */}
-      <SignedOut>
-        <section className="py-8 px-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-white border-4 border-black p-8 shadow-neo text-center">
-              <h3 className="text-xl font-black uppercase mb-4">
-                Sign in to Subscribe
-              </h3>
-              <p className="font-bold text-gray-600 mb-6">
-                Create an account or sign in to choose a plan.
-              </p>
-              <Link
-                to="/sign-up"
-                className="inline-block px-8 py-4 bg-neo-green text-black font-black uppercase border-4 border-black shadow-neo hover:shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-              >
-                Get Started Free
-              </Link>
-            </div>
-          </div>
-        </section>
-      </SignedOut>
 
       {/* Demo Note */}
       <section className="py-8 px-6">

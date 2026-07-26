@@ -1,20 +1,63 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8000/api",
+  baseURL: "/api",
   headers: {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
   },
 });
 
+// Interceptor to attach JWT token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("study_auth_token");
+  if (token && config.headers) {
+    config.headers["Authorization"] = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Auth API calls
+export const registerApi = async (email: string, password: string) => {
+  const response = await api.post("/auth/register", { email, password });
+  return response.data;
+};
+
+export const loginApi = async (email: string, password: string) => {
+  const response = await api.post("/auth/login", { email, password });
+  return response.data;
+};
+
+export const getMeApi = async () => {
+  const response = await api.get("/auth/me");
+  return response.data;
+};
+
+// User Management
+export const getUserId = (): string => {
+  let userId = localStorage.getItem("study_user_id");
+  if (!userId) {
+    userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem("study_user_id", userId);
+  }
+  return userId;
+};
+
 // Session Management
 export const createSession = async () => {
-  const response = await api.post("/session/create");
+  const userId = getUserId();
+  const response = await api.post("/session/create", { user_id: userId });
   return response.data;
 };
 
 export const deleteSession = async (sessionId: string) => {
   const response = await api.delete(`/session/${sessionId}`);
+  return response.data;
+};
+
+export const getSessionHistory = async () => {
+  const userId = getUserId();
+  const response = await api.get(`/session/history/${userId}`);
   return response.data;
 };
 
@@ -31,12 +74,10 @@ export const getOrCreateSession = async (): Promise<string> => {
 // Upload
 export const uploadFiles = async (
   files: File[],
-  youtubeUrl: string,
   sessionId: string,
 ) => {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
-  if (youtubeUrl) formData.append("youtube_url", youtubeUrl);
   formData.append("session_id", sessionId);
 
   const response = await api.post("/upload/", formData, {
@@ -156,7 +197,7 @@ export const interactAudio = async (
 export interface ImageGenerationResult {
   success: boolean;
   image_url?: string;
-  image_data?: string; // Base64 encoded image from Nova Canvas
+  image_data?: string;
   original_topic?: string;
   concept?: string;
   generated_prompt: string;
@@ -207,10 +248,9 @@ export const generateSlides = async (
 
   const response = await api.post("/slides/generate", formData, {
     headers: { "Content-Type": "multipart/form-data" },
-    responseType: "blob", // Important for file download
+    responseType: "blob",
   });
 
-  // Handle download
   const blob = new Blob([response.data], {
     type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   });

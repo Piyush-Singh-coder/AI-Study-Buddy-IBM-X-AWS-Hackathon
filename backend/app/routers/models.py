@@ -6,83 +6,79 @@ router = APIRouter()
 @router.get("/")
 def get_active_models():
     """
-    Returns the comprehensive list of AI models powering each feature.
+    Returns the list of AI models powering each feature.
     """
+    provider_name = "NVIDIA NIM Free Endpoints" if settings.LLM_PROVIDER == "nvidia" else "Google Gemini Free Tier"
+    primary_model = settings.NVIDIA_TEXT_MODEL if settings.LLM_PROVIDER == "nvidia" else settings.GEMINI_TEXT_MODEL
+    embedding_model = settings.GEMINI_EMBEDDING_MODEL if settings.GEMINI_API_KEY else "all-MiniLM-L6-v2 (Local HuggingFace)"
+
     return {
         "features": {
             "chat_rag": {
                 "name": "Chat & RAG",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_TEXT_MODEL,
+                "provider": provider_name,
+                "model_id": primary_model,
                 "description": "Powers the chat interface and contextual Q&A from your documents."
             },
             "embeddings": {
                 "name": "Vector Embeddings",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_EMBEDDING_MODEL,
-                "description": "Converts document text into 1536-dim vectors for semantic search (PGVector)."
+                "provider": "Google Gemini / HuggingFace",
+                "model_id": embedding_model,
+                "description": "Converts document text into vectors for semantic search (PGVector)."
             },
             "summary": {
                 "name": "Summary Generator",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_TEXT_MODEL,
+                "provider": provider_name,
+                "model_id": primary_model,
                 "description": "Creates brief or detailed summaries from uploaded materials."
             },
             "quiz": {
                 "name": "Quiz Generator",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_TEXT_MODEL,
+                "provider": provider_name,
+                "model_id": primary_model,
                 "description": "Generates MCQ quizzes based on document content."
             },
             "slides": {
                 "name": "Slide Generator",
-                "provider": "OpenAI + python-pptx",
-                "model_id": settings.OPENAI_TEXT_MODEL,
+                "provider": f"{provider_name} + python-pptx",
+                "model_id": primary_model,
                 "description": "Generates structured content for PowerPoint presentations."
             },
             "teacher_brain": {
-                "name": "AI Teacher (Reasoning + TTS)",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_TEXT_MODEL,
-                "description": "Powers the AI Teacher's explanations with analogies and examples."
+                "name": "AI Teacher (Reasoning + Edge TTS)",
+                "provider": f"{provider_name} + Edge TTS",
+                "model_id": primary_model,
+                "description": "Powers the AI Teacher's explanations with voice synthesis."
             },
             "image_generation": {
                 "name": "Image Generator",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_IMAGE_MODEL,
+                "provider": "Free Educational Image Engine",
+                "model_id": "Pollinations.ai",
                 "description": "Creates educational diagrams and illustrations from text prompts."
             },
             "image_vision": {
                 "name": "Image Analysis (OCR)",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_TEXT_MODEL,
+                "provider": provider_name,
+                "model_id": primary_model,
                 "description": "Extracts text and analyzes diagrams from uploaded images using vision."
             },
             "speech_to_text": {
                 "name": "Voice Input (STT)",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_STT_MODEL,
+                "provider": "Google Gemini Audio",
+                "model_id": "gemini-2.0-flash",
                 "description": "Converts student voice recordings into text for the Teacher mode."
             },
             "text_to_speech": {
                 "name": "AI Teacher Voice (TTS)",
-                "provider": "OpenAI",
-                "model_id": settings.OPENAI_TTS_MODEL,
+                "provider": "Microsoft Edge TTS Engine",
+                "model_id": "en-US-AvaNeural",
                 "description": "Synthesizes natural-sounding speech for the AI Teacher's responses."
-            },
-            "sample_paper": {
-                "name": "PYQ Sample Paper",
-                "provider": "OpenAI + python-docx",
-                "model_id": settings.OPENAI_TEXT_MODEL,
-                "description": "Generates sample exam papers based on PYQ pattern analysis."
             }
         },
         "summary": {
-            "primary_llm": settings.OPENAI_TEXT_MODEL,
-            "embedding_model": settings.OPENAI_EMBEDDING_MODEL,
-            "image_model": settings.OPENAI_IMAGE_MODEL,
-            "stt_service": settings.OPENAI_STT_MODEL,
-            "tts_service": settings.OPENAI_TTS_MODEL
+            "primary_llm": primary_model,
+            "embedding_model": embedding_model,
+            "provider": provider_name
         },
-        "cloud_provider": "OpenAI"
+        "cloud_provider": provider_name
     }

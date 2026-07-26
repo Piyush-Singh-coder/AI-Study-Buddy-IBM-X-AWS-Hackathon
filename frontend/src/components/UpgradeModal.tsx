@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { X, Crown, Check } from "lucide-react";
-import { PricingTable } from "@clerk/clerk-react";
 import { useSubscription } from "../hooks/useSubscription";
+import { useAuth } from "../context/AuthContext";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -11,8 +11,8 @@ interface UpgradeModalProps {
 
 const UpgradeModal = ({ isOpen, onClose, feature }: UpgradeModalProps) => {
   const { isPro } = useSubscription();
+  const { upgradeToPro } = useAuth();
 
-  // Auto-close modal if user upgrades successfully
   useEffect(() => {
     if (isPro && isOpen) {
       onClose();
@@ -21,9 +21,14 @@ const UpgradeModal = ({ isOpen, onClose, feature }: UpgradeModalProps) => {
 
   if (!isOpen) return null;
 
+  const handleUpgrade = () => {
+    upgradeToPro();
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center z-[100] p-4 overflow-y-auto items-start pt-10 md:pt-20">
-      <div className="bg-white border-4 border-black shadow-neo-lg max-w-5xl w-full relative mb-10">
+      <div className="bg-white border-4 border-black shadow-neo-lg max-w-lg w-full relative mb-10">
         {/* Header */}
         <div className="bg-neo-purple p-6 border-b-4 border-black">
           <button
@@ -45,7 +50,7 @@ const UpgradeModal = ({ isOpen, onClose, feature }: UpgradeModalProps) => {
           </div>
         </div>
 
-        {/* Clerk Pricing Table */}
+        {/* Content */}
         <div className="p-6">
           <div className="bg-neo-yellow/20 border-2 border-black p-4 mb-6">
             <p className="font-bold text-sm flex items-center gap-2">
@@ -57,7 +62,7 @@ const UpgradeModal = ({ isOpen, onClose, feature }: UpgradeModalProps) => {
           {/* Pro Features List */}
           <div className="mb-6">
             <h3 className="font-black text-lg mb-4 uppercase">Pro includes:</h3>
-            <ul className="grid grid-cols-2 gap-3">
+            <ul className="grid grid-cols-1 gap-3">
               {[
                 "🎙️ AI Teacher with Voice",
                 "🖼️ Image Generation",
@@ -72,10 +77,12 @@ const UpgradeModal = ({ isOpen, onClose, feature }: UpgradeModalProps) => {
             </ul>
           </div>
 
-          {/* Clerk's Built-in Pricing Table */}
-          <div className="border-4 border-black p-4 bg-gray-50">
-            <PricingTable />
-          </div>
+          <button
+            onClick={handleUpgrade}
+            className="w-full py-4 bg-neo-green text-black font-black uppercase border-4 border-black shadow-neo hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-neo-sm transition-all"
+          >
+            Upgrade to Pro Now — Demo
+          </button>
         </div>
       </div>
     </div>

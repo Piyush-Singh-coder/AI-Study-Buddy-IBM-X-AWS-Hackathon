@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import {
   Upload,
-  Youtube,
   FileText,
   Loader2,
   X,
@@ -15,17 +13,23 @@ import {
   Presentation,
   Brain,
   Sparkles,
-  ArrowRight,
+  UserCheck,
+  LogOut,
 } from "lucide-react";
-import { uploadFiles, getOrCreateSession } from "../services/api";
+import { uploadFiles, getOrCreateSession, getSessionDocuments } from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import AuthModal from "../components/AuthModal";
 
 const Home = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [files, setFiles] = useState<File[]>([]);
-  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState("");
   const [error, setError] = useState("");
   const [showUpload, setShowUpload] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   const existingSessionId = localStorage.getItem("study_session_id");
   const isAddingToSession = !!existingSessionId;
@@ -44,21 +48,45 @@ const Home = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (files.length === 0 && !youtubeUrl) {
-      setError("Please upload at least one file or provide a YouTube URL.");
+    if (files.length === 0) {
+      setError("Please upload at least one file to start.");
       return;
     }
 
     setIsLoading(true);
+    setLoadingStatus("UPLOADING...");
     setError("");
 
     try {
       const sessionId = await getOrCreateSession();
       if (!sessionId) {
         setError("Failed to create session. Please try again.");
+        setIsLoading(false);
         return;
       }
-      await uploadFiles(files, youtubeUrl, sessionId);
+      await uploadFiles(files, sessionId);
+      
+      setLoadingStatus("ANALYZING DOCUMENTS...");
+      
+      let isReady = false;
+      let attempts = 0;
+      const maxAttempts = 20;
+
+      while (!isReady && attempts < maxAttempts) {
+        try {
+          const data = await getSessionDocuments(sessionId);
+          if (data && data.documents && data.documents.length > 0) {
+            isReady = true;
+          } else {
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        } catch (e) {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
       navigate("/dashboard");
     } catch (err) {
       console.error(err);
@@ -66,7 +94,6 @@ const Home = () => {
         (err as any)?.response?.data?.detail ||
         "Upload failed. Please try again.";
       setError(errorMessage);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -112,6 +139,13 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-neo-yellow pattern-dots">
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authMode}
+      />
+
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b-4 border-black">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -122,30 +156,44 @@ const Home = () => {
             <h1 className="text-2xl font-black uppercase">AI Study Buddy</h1>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <SignedOut>
-              <Link
-                to="/sign-in"
-                className="px-6 py-2 font-bold border-2 border-black bg-white hover:bg-gray-100 transition-colors"
-              >
-                LOG IN
-              </Link>
-              <Link
-                to="/sign-up"
-                className="px-6 py-2 font-bold border-2 border-black bg-neo-green text-black shadow-neo-sm hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-              >
-                SIGN UP
-              </Link>
-            </SignedOut>
-            <SignedIn>
-              <Link
-                to="/dashboard"
-                className="px-6 py-2 font-bold border-2 border-black bg-neo-blue text-white shadow-neo-sm hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-              >
-                DASHBOARD
-              </Link>
-              <UserButton afterSignOutUrl="/" />
-            </SignedIn>
+          <div className="flex items-center space-x-3">
+            {user ? (
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 bg-neo-green/30 border-2 border-black px-3 py-1.5 font-bold text-sm">
+                  <UserCheck size={18} className="text-black" />
+                  <span className="truncate max-w-[150px]">{user.email}</span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="p-2 bg-white border-2 border-black shadow-neo-sm hover:bg-neo-red hover:text-white transition-all"
+                  title="Sign Out"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => { setAuthMode("login"); setAuthModalOpen(true); }}
+                  className="px-4 py-2 font-bold border-2 border-black bg-white text-black shadow-neo-sm hover:bg-gray-100 transition-all text-sm"
+                >
+                  SIGN IN
+                </button>
+                <button
+                  onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }}
+                  className="px-4 py-2 font-bold border-2 border-black bg-neo-green text-black shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] transition-all text-sm"
+                >
+                  REGISTER
+                </button>
+              </div>
+            )}
+
+            <Link
+              to="/dashboard"
+              className="px-5 py-2 font-bold border-2 border-black bg-neo-blue text-white shadow-neo-sm hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all text-sm"
+            >
+              DASHBOARD
+            </Link>
           </div>
         </div>
       </header>
@@ -155,9 +203,7 @@ const Home = () => {
         <div className="max-w-5xl mx-auto text-center">
           <div className="inline-flex items-center space-x-2 bg-white border-2 border-black px-4 py-2 mb-6 shadow-neo-sm">
             <Sparkles size={20} className="text-neo-purple" />
-            <span className="font-bold text-sm uppercase">
-              Powered by AWS 
-            </span>
+            <span className="font-bold text-sm uppercase">Powered by Gemini & NVIDIA AI</span>
           </div>
 
           <h2 className="text-5xl md:text-7xl font-black uppercase mb-6 leading-tight">
@@ -167,29 +213,17 @@ const Home = () => {
           </h2>
 
           <p className="text-xl font-bold text-gray-700 mb-8 max-w-2xl mx-auto">
-            Upload PDFs, audio, or YouTube videos. Get AI-powered summaries,
+            Upload PDFs, audio files, or study diagrams. Get AI-powered summaries,
             quizzes, and personalized tutoring.
           </p>
 
-          <SignedOut>
-            <Link
-              to="/sign-up"
-              className="inline-flex items-center space-x-3 px-8 py-4 bg-neo-purple text-white font-black uppercase text-lg border-4 border-black shadow-neo hover:shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-            >
-              <span>Get Started Free</span>
-              <ArrowRight size={24} />
-            </Link>
-          </SignedOut>
-
-          <SignedIn>
-            <button
-              onClick={() => setShowUpload(true)}
-              className="inline-flex items-center space-x-3 px-8 py-4 bg-neo-green text-black font-black uppercase text-lg border-4 border-black shadow-neo hover:shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-            >
-              <Upload size={24} />
-              <span>Upload Study Materials</span>
-            </button>
-          </SignedIn>
+          <button
+            onClick={() => setShowUpload(true)}
+            className="inline-flex items-center space-x-3 px-8 py-4 bg-neo-green text-black font-black uppercase text-lg border-4 border-black shadow-neo hover:shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+          >
+            <Upload size={24} />
+            <span>Upload Study Materials</span>
+          </button>
         </div>
       </section>
 
@@ -226,7 +260,7 @@ const Home = () => {
           <div className="bg-white border-4 border-black shadow-neo-lg max-w-lg w-full p-8 relative">
             <button
               onClick={() => setShowUpload(false)}
-              className="absolute top-4 right-4 p-2 hover:bg-gray-100"
+              className="absolute top-4 right-4 p-2 hover:bg-gray-100 border-2 border-black"
             >
               <X size={24} />
             </button>
@@ -301,33 +335,6 @@ const Home = () => {
                 )}
               </div>
 
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t-2 border-black"></div>
-                <span className="flex-shrink-0 mx-4 text-black font-black uppercase text-sm">
-                  OR
-                </span>
-                <div className="flex-grow border-t-2 border-black"></div>
-              </div>
-
-              {/* YouTube URL */}
-              <div className="space-y-2">
-                <label className="block text-sm font-bold uppercase text-black">
-                  YouTube URL
-                </label>
-                <div className="relative">
-                  <div className="absolute left-3 top-3 text-black">
-                    <Youtube size={20} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="https://youtube.com/..."
-                    value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border-2 border-black focus:shadow-neo transition-all outline-none font-bold"
-                  />
-                </div>
-              </div>
-
               {error && (
                 <div className="bg-neo-red text-white p-3 border-2 border-black font-bold text-sm shadow-neo-sm">
                   ⚠️ {error}
@@ -337,7 +344,7 @@ const Home = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full py-4 text-white font-black uppercase tracking-wider flex items-center justify-center space-x-2 transition-all border-2 border-black ${
+                className={`w-full py-4 text-black font-black uppercase tracking-wider flex items-center justify-center space-x-2 transition-all border-2 border-black ${
                   isLoading
                     ? "bg-gray-400 cursor-not-allowed shadow-none translate-x-[4px] translate-y-[4px]"
                     : "bg-neo-green shadow-neo hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-neo-sm active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
@@ -345,8 +352,8 @@ const Home = () => {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="animate-spin" size={20} />
-                    <span>PROCESSING...</span>
+                    <Loader2 className="animate-spin text-black" size={20} />
+                    <span>{loadingStatus}</span>
                   </>
                 ) : (
                   <span>

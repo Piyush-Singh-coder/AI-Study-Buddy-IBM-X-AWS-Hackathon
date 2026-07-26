@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from app.routers import session, upload, quiz, chat, audio, image, slides, models
+from app.routers import session, upload, quiz, chat, audio, image, slides, models, auth
 from app.database import create_db_and_tables
 import os
 
@@ -11,7 +11,7 @@ app = FastAPI(title="AI Study Buddy API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for ngrok demo
+    allow_origins=["*"],  # Allow all origins for local/ngrok demo
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,6 +23,7 @@ def on_startup():
     create_db_and_tables()
 
 # Include Routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(session.router, prefix="/api/session", tags=["Session"])
 app.include_router(upload.router, prefix="/api/upload", tags=["Upload"])
 app.include_router(quiz.router, prefix="/api/quiz", tags=["Quiz"])
@@ -55,4 +56,4 @@ if os.path.exists(FRONTEND_DIST):
 else:
     @app.get("/")
     def read_root():
-        return {"message": "AI Study Buddy API is running. Build the frontend first."}
+        return {"message": "AI Study Buddy API is running."}
