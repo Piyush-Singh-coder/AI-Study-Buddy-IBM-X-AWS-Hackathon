@@ -71,8 +71,9 @@ export const clearSessionHistory = async () => {
   return response.data;
 };
 
-export const getSessionDocuments = async (sessionId: string) => {
-  const response = await api.get(`/quiz/documents/${sessionId}`);
+export const getSessionDocuments = async (sessionId: any) => {
+  const id = typeof sessionId === "string" ? sessionId : sessionId?.session_id || sessionId?.id || "";
+  const response = await api.get(`/quiz/documents/${id}`);
   return response.data;
 };
 
