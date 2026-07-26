@@ -36,12 +36,16 @@ app.include_router(models.router, prefix="/api/models", tags=["Models"])
 # Serve React frontend build
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
 
-if os.path.exists(FRONTEND_DIST):
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+ASSETS_DIR = os.path.join(FRONTEND_DIST, "assets")
+INDEX_HTML = os.path.join(FRONTEND_DIST, "index.html")
+
+if os.path.exists(INDEX_HTML):
+    if os.path.exists(ASSETS_DIR):
+        app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
     @app.get("/")
     def serve_root():
-        with open(os.path.join(FRONTEND_DIST, "index.html")) as f:
+        with open(INDEX_HTML) as f:
             return HTMLResponse(content=f.read())
 
     # Catch-all for React Router (client-side routing)
@@ -50,8 +54,7 @@ if os.path.exists(FRONTEND_DIST):
         # Don't intercept /api routes
         if full_path.startswith("api"):
             return {"detail": "Not found"}
-        index_path = os.path.join(FRONTEND_DIST, "index.html")
-        with open(index_path) as f:
+        with open(INDEX_HTML) as f:
             return HTMLResponse(content=f.read())
 else:
     @app.get("/")
