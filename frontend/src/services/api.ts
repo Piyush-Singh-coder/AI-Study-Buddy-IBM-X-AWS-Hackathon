@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
   headers: {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
@@ -61,90 +61,39 @@ export const getSessionHistory = async () => {
   return response.data;
 };
 
-export const getOrCreateSession = async (): Promise<string> => {
-  let sessionId = localStorage.getItem("study_session_id");
-  if (!sessionId) {
-    const data = await createSession();
-    sessionId = data.session_id;
-    localStorage.setItem("study_session_id", sessionId!);
-  }
-  return sessionId!;
+export const clearSessionHistory = async () => {
+  const userId = getUserId();
+  const response = await api.delete(`/session/history/${userId}`);
+  return response.data;
 };
 
-// Upload
-export const uploadFiles = async (
-  files: File[],
-  sessionId: string,
-) => {
+// Study Material Processing
+export const uploadFile = async (file: File, sessionId: string) => {
   const formData = new FormData();
-  files.forEach((file) => formData.append("files", file));
+  formData.append("file", file);
   formData.append("session_id", sessionId);
 
   const response = await api.post("/upload/", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   });
   return response.data;
 };
 
-// Documents
-export const getSessionDocuments = async (sessionId: string) => {
-  const response = await api.get(`/quiz/documents/${sessionId}`);
-  return response.data;
-};
-
-// Chat
-export const chat = async (query: string, sessionId: string) => {
-  const response = await api.post("/chat/", { query, session_id: sessionId });
-  return response.data;
-};
-
-// Quiz
-export interface QuizOptions {
-  topic?: string;
-  difficulty?: "easy" | "medium" | "hard";
-  num_questions?: number;
-}
-
-export interface QuizResult {
-  questions: any[];
-  count: number;
-  difficulty: string;
-  requested?: number;
-  warning?: string;
-  error?: string;
-}
-
-export const generateQuiz = async (
-  sessionId: string,
-  options: QuizOptions = {},
-): Promise<QuizResult> => {
-  const response = await api.post("/quiz/generate", {
+// RAG Features
+export const sendChatMessage = async (query: str, sessionId: string) => {
+  const response = await api.post("/chat/", {
+    query,
     session_id: sessionId,
-    topic: options.topic || "general",
-    difficulty: options.difficulty || "medium",
-    num_questions: options.num_questions || 5,
   });
   return response.data;
 };
 
-export const analyzeWeakSpots = async (
-  sessionId: string,
-  questions: any[],
-  userAnswers: { [key: string]: string },
-) => {
-  const response = await api.post("/quiz/analyze", {
-    session_id: sessionId,
-    questions,
-    user_answers: userAnswers,
-  });
-  return response.data;
-};
-
-// Summary
 export const generateSummary = async (
   sessionId: string,
-  summaryType: "brief" | "detailed" = "detailed",
-  sourceFilter?: string,
+  summaryType: string = "detailed",
+  sourceFilter?: string
 ) => {
   const response = await api.post("/quiz/summary", {
     session_id: sessionId,
@@ -154,92 +103,81 @@ export const generateSummary = async (
   return response.data;
 };
 
-// Sample Paper
-export const generateSamplePaper = async (sessionId: string, file: File) => {
-  const formData = new FormData();
-  formData.append("session_id", sessionId);
-  formData.append("file", file);
-
-  const response = await api.post("/quiz/pyq-generator", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+export const generateQuiz = async (
+  sessionId: string,
+  topic: string = "general",
+  difficulty: string = "medium",
+  numQuestions: number = 5
+) => {
+  const response = await api.post("/quiz/generate", {
+    session_id: sessionId,
+    topic,
+    difficulty,
+    num_questions: numQuestions,
   });
   return response.data;
 };
 
-export const downloadSamplePaper = async (paperData: any) => {
+export const analyzeWeakSpots = async (
+  sessionId: string,
+  questions: any[],
+  userAnswers: Record<string, string>
+) => {
+  const response = await api.post("/quiz/analyze", {
+    session_id: sessionId,
+    questions,
+    user_answers: userAnswers,
+  });
+  return response.data;
+};
+
+// PYQ Features
+export const generatePyqSample = async (file: File, sessionId: string) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("session_id", sessionId);
+
+  const response = await api.post("/quiz/pyq-generator", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+export const downloadSamplePaperDocx = async (paperData: any) => {
   const response = await api.post("/quiz/download-paper", paperData, {
     responseType: "blob",
   });
   return response.data;
 };
 
-// Teacher Audio Interaction
-export const interactAudio = async (
+// AI Teacher & Audio
+export const interactTeacher = async (
   sessionId: string,
-  text?: string,
-  audioBlob?: Blob,
+  textInput?: string,
   language: string = "English",
+  audioFile?: Blob
 ) => {
   const formData = new FormData();
   formData.append("session_id", sessionId);
   formData.append("language", language);
-
-  if (text) formData.append("text_input", text);
-  if (audioBlob) formData.append("audio_file", audioBlob, "recording.webm");
+  if (textInput) formData.append("text_input", textInput);
+  if (audioFile) formData.append("audio_file", audioFile, "recording.webm");
 
   const response = await api.post("/audio/interact", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   });
   return response.data;
 };
 
-// Image Generation
-export interface ImageGenerationResult {
-  success: boolean;
-  image_url?: string;
-  image_data?: string;
-  original_topic?: string;
-  concept?: string;
-  generated_prompt: string;
-  revised_prompt?: string;
-  context_used?: string;
-  note: string;
-}
-
-export const generateImage = async (
+// Slide Presentation Generator
+export const generateSlidesPptx = async (
   sessionId: string,
   topic: string,
-  style: string = "educational diagram",
-): Promise<ImageGenerationResult> => {
-  const formData = new FormData();
-  formData.append("session_id", sessionId);
-  formData.append("topic", topic);
-  formData.append("style", style);
-
-  const response = await api.post("/image/generate", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return response.data;
-};
-
-export const generateImageFromContext = async (
-  sessionId: string,
-  concept: string,
-): Promise<ImageGenerationResult> => {
-  const formData = new FormData();
-  formData.append("session_id", sessionId);
-  formData.append("concept", concept);
-
-  const response = await api.post("/image/generate-from-context", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return response.data;
-};
-
-export const generateSlides = async (
-  sessionId: string,
-  topic: string,
-  numSlides: number = 5,
+  numSlides: number = 5
 ) => {
   const formData = new FormData();
   formData.append("session_id", sessionId);
@@ -247,27 +185,28 @@ export const generateSlides = async (
   formData.append("num_slides", numSlides.toString());
 
   const response = await api.post("/slides/generate", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
     responseType: "blob",
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   });
-
-  const blob = new Blob([response.data], {
-    type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${topic.replace(/\s+/g, "_")}_Presentation.pptx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  window.URL.revokeObjectURL(url);
-
-  return true;
+  return response.data;
 };
 
-// Models
-export const getModels = async () => {
+// Diagram & Image Generator
+export const generateEducationalDiagram = async (
+  prompt: string,
+  topic?: string
+) => {
+  const response = await api.post("/image/generate", {
+    prompt,
+    topic: topic || "Educational Diagram",
+  });
+  return response.data;
+};
+
+// System Models Status
+export const getModelsStatus = async () => {
   const response = await api.get("/models/");
   return response.data;
 };
