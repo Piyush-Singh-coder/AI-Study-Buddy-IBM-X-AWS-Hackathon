@@ -9,7 +9,11 @@ except ImportError:
     ChatGoogleGenerativeAI = None
 
 from langchain_openai import ChatOpenAI
-from langchain_community.embeddings import HuggingFaceEmbeddings
+try:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+except Exception:
+    HuggingFaceEmbeddings = None
+
 from langchain_community.embeddings import FakeEmbeddings
 from langchain_postgres import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -62,7 +66,10 @@ class RAGService:
             
         # Fast embeddings (local HuggingFace)
         try:
-            self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            if HuggingFaceEmbeddings:
+                self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            else:
+                self.embeddings = FakeEmbeddings(size=384)
         except Exception:
             self.embeddings = FakeEmbeddings(size=384)
         

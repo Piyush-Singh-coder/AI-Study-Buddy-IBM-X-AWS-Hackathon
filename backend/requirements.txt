@@ -8,7 +8,6 @@ pgvector
 langchain
 langchain-aws
 langchain-openai
-sentence-transformers
 boto3
 langchain-google-genai
 google-generativeai
