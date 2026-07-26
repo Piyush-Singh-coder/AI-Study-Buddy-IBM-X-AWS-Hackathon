@@ -50,6 +50,10 @@ export const createSession = async () => {
   return response.data;
 };
 
+export const getOrCreateSession = async () => {
+  return createSession();
+};
+
 export const deleteSession = async (sessionId: string) => {
   const response = await api.delete(`/session/${sessionId}`);
   return response.data;
@@ -67,6 +71,11 @@ export const clearSessionHistory = async () => {
   return response.data;
 };
 
+export const getSessionDocuments = async (sessionId: string) => {
+  const response = await api.get(`/quiz/documents/${sessionId}`);
+  return response.data;
+};
+
 // Study Material Processing
 export const uploadFile = async (file: File, sessionId: string) => {
   const formData = new FormData();
@@ -81,13 +90,27 @@ export const uploadFile = async (file: File, sessionId: string) => {
   return response.data;
 };
 
+export const uploadFiles = async (files: FileList | File[], sessionId: string) => {
+  const fileArray = Array.from(files);
+  const results = [];
+  for (const file of fileArray) {
+    const res = await uploadFile(file, sessionId);
+    results.push(res);
+  }
+  return results;
+};
+
 // RAG Features
-export const sendChatMessage = async (query: str, sessionId: string) => {
+export const sendChatMessage = async (query: string, sessionId: string) => {
   const response = await api.post("/chat/", {
     query,
     session_id: sessionId,
   });
   return response.data;
+};
+
+export const chat = async (sessionId: string, query: string) => {
+  return sendChatMessage(query, sessionId);
 };
 
 export const generateSummary = async (
@@ -104,16 +127,35 @@ export const generateSummary = async (
 };
 
 export const generateQuiz = async (
-  sessionId: string,
-  topic: string = "general",
-  difficulty: string = "medium",
-  numQuestions: number = 5
+  arg1: any,
+  arg2?: any,
+  arg3?: string,
+  arg4?: number
 ) => {
+  let sessionId = typeof arg1 === "string" ? arg1 : arg1?.session_id || arg1?.sessionId;
+  let topicVal = "general";
+  let diffVal = "medium";
+  let numQVal = 5;
+
+  if (typeof arg2 === "object" && arg2 !== null) {
+    topicVal = arg2.topic || "general";
+    diffVal = arg2.difficulty || "medium";
+    numQVal = arg2.num_questions || arg2.numQuestions || 5;
+  } else if (typeof arg2 === "string") {
+    topicVal = arg2;
+    if (typeof arg3 === "string") diffVal = arg3;
+    if (typeof arg4 === "number") numQVal = arg4;
+  } else if (typeof arg1 === "object" && arg1 !== null) {
+    topicVal = arg1.topic || "general";
+    diffVal = arg1.difficulty || "medium";
+    numQVal = arg1.num_questions || arg1.numQuestions || 5;
+  }
+
   const response = await api.post("/quiz/generate", {
     session_id: sessionId,
-    topic,
-    difficulty,
-    num_questions: numQuestions,
+    topic: topicVal,
+    difficulty: diffVal,
+    num_questions: numQVal,
   });
   return response.data;
 };
@@ -132,9 +174,20 @@ export const analyzeWeakSpots = async (
 };
 
 // PYQ Features
-export const generatePyqSample = async (file: File, sessionId: string) => {
+export const generatePyqSample = async (arg1: any, arg2?: any) => {
+  let file: File;
+  let sessionId: string;
+
+  if (arg1 instanceof File) {
+    file = arg1;
+    sessionId = typeof arg2 === "string" ? arg2 : "";
+  } else {
+    sessionId = String(arg1);
+    file = arg2 as File;
+  }
+
   const formData = new FormData();
-  formData.append("file", file);
+  if (file) formData.append("file", file);
   formData.append("session_id", sessionId);
 
   const response = await api.post("/quiz/pyq-generator", formData, {
@@ -145,6 +198,10 @@ export const generatePyqSample = async (file: File, sessionId: string) => {
   return response.data;
 };
 
+export const generateSamplePaper = async (arg1: any, arg2?: any) => {
+  return generatePyqSample(arg1, arg2);
+};
+
 export const downloadSamplePaperDocx = async (paperData: any) => {
   const response = await api.post("/quiz/download-paper", paperData, {
     responseType: "blob",
@@ -152,13 +209,37 @@ export const downloadSamplePaperDocx = async (paperData: any) => {
   return response.data;
 };
 
+export const downloadSamplePaper = async (paperData: any) => {
+  return downloadSamplePaperDocx(paperData);
+};
+
 // AI Teacher & Audio
 export const interactTeacher = async (
   sessionId: string,
-  textInput?: string,
-  language: string = "English",
-  audioFile?: Blob
+  arg2?: any,
+  arg3?: any,
+  arg4?: any
 ) => {
+  let textInput: string | undefined = undefined;
+  let language: string = "English";
+  let audioFile: Blob | undefined = undefined;
+
+  if (typeof arg2 === "string") {
+    textInput = arg2;
+  } else if (arg2 instanceof Blob) {
+    audioFile = arg2;
+  }
+
+  if (typeof arg3 === "string") {
+    language = arg3;
+  } else if (arg3 instanceof Blob) {
+    audioFile = arg3;
+  }
+
+  if (arg4 instanceof Blob) {
+    audioFile = arg4;
+  }
+
   const formData = new FormData();
   formData.append("session_id", sessionId);
   formData.append("language", language);
@@ -171,6 +252,15 @@ export const interactTeacher = async (
     },
   });
   return response.data;
+};
+
+export const interactAudio = async (
+  sessionId: string,
+  arg2?: any,
+  arg3?: any,
+  arg4?: any
+) => {
+  return interactTeacher(sessionId, arg2, arg3, arg4);
 };
 
 // Slide Presentation Generator
@@ -193,11 +283,31 @@ export const generateSlidesPptx = async (
   return response.data;
 };
 
+export const generateSlides = async (
+  sessionId: string,
+  topic: string,
+  numSlides: number = 5
+) => {
+  return generateSlidesPptx(sessionId, topic, numSlides);
+};
+
 // Diagram & Image Generator
+export interface ImageGenerationResult {
+  image_url?: string;
+  image_data?: string;
+  original_topic?: string;
+  concept?: string;
+  generated_prompt?: string;
+  context_used?: string;
+  note?: string;
+  topic?: string;
+  prompt?: string;
+}
+
 export const generateEducationalDiagram = async (
   prompt: string,
   topic?: string
-) => {
+): Promise<ImageGenerationResult> => {
   const response = await api.post("/image/generate", {
     prompt,
     topic: topic || "Educational Diagram",
@@ -205,10 +315,32 @@ export const generateEducationalDiagram = async (
   return response.data;
 };
 
+export const generateImage = async (
+  prompt: string,
+  topic?: string,
+  sessionId?: string
+): Promise<ImageGenerationResult> => {
+  return generateEducationalDiagram(prompt, topic || sessionId || "Educational Diagram");
+};
+
+export const generateImageFromContext = async (
+  arg1: string,
+  arg2?: string,
+  arg3?: string
+): Promise<ImageGenerationResult> => {
+  const prompt = arg2 || arg1;
+  const topic = arg3 || "Context Diagram";
+  return generateEducationalDiagram(prompt, topic);
+};
+
 // System Models Status
 export const getModelsStatus = async () => {
   const response = await api.get("/models/");
   return response.data;
+};
+
+export const getModels = async () => {
+  return getModelsStatus();
 };
 
 export default api;
