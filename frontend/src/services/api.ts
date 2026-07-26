@@ -47,7 +47,11 @@ export const getUserId = (): string => {
 export const createSession = async () => {
   const userId = getUserId();
   const response = await api.post("/session/create", { user_id: userId });
-  return response.data;
+  const sessionId = response.data?.session_id || response.data;
+  if (typeof sessionId === "string") {
+    localStorage.setItem("study_session_id", sessionId);
+  }
+  return sessionId;
 };
 
 export const getOrCreateSession = async () => {

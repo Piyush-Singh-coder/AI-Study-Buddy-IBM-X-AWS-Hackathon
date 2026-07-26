@@ -58,12 +58,14 @@ const Home = () => {
     setError("");
 
     try {
-      const sessionId = await getOrCreateSession();
-      if (!sessionId) {
+      const resSession = await getOrCreateSession();
+      const sessionId = typeof resSession === "string" ? resSession : resSession?.session_id;
+      if (!sessionId || typeof sessionId !== "string") {
         setError("Failed to create session. Please try again.");
         setIsLoading(false);
         return;
       }
+      localStorage.setItem("study_session_id", sessionId);
       await uploadFiles(files, sessionId);
       
       setLoadingStatus("ANALYZING DOCUMENTS...");
