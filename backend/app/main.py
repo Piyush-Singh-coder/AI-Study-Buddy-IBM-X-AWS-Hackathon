@@ -20,7 +20,10 @@ app.add_middleware(
 # Startup
 @app.on_event("startup")
 def on_startup():
-    create_db_and_tables()
+    try:
+        create_db_and_tables()
+    except Exception as e:
+        print(f"DB Startup warning (will retry on request): {e}")
 
 # Include Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
