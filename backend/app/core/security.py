@@ -13,14 +13,16 @@ def hash_password(password: str) -> str:
     """Hashes a password securely using PBKDF2-HMAC-SHA256."""
     salt = os.urandom(16)
     pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
-    return f"{salt.hex()}:${pwd_hash.hex()}"
+    return f"{salt.hex()}:{pwd_hash.hex()}"
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifies a plain password against a stored hashed_password."""
     try:
         if ":" not in hashed_password:
             return False
-        salt_hex, stored_hash_hex = hashed_password.split(":")
+        parts = hashed_password.split(":")
+        salt_hex = parts[0]
+        stored_hash_hex = parts[1].lstrip("$")  # Backwards-compatible with :$ and : formats
         salt = bytes.fromhex(salt_hex)
         pwd_hash = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt, 100000)
         return pwd_hash.hex() == stored_hash_hex
