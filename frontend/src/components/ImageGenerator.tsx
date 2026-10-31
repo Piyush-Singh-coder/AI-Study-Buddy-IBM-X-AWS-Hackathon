@@ -1,15 +1,20 @@
 import React, { useState } from "react";
 import {
-  Image,
+  Image as ImageIcon,
   Loader2,
   Download,
   Sparkles,
-  BookOpen,
-  AlertCircle,
   Info,
+  Maximize2,
+  X,
+  Copy,
+  Check,
+  Lightbulb
 } from "lucide-react";
 import { generateImage, generateImageFromContext } from "../services/api";
 import type { ImageGenerationResult } from "../services/api";
+import { playAudioChime } from "../utils/theme";
+import toast from "react-hot-toast";
 
 interface ImageGeneratorProps {
   sessionId: string;
@@ -22,39 +27,57 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ sessionId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ImageGenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   const styleOptions = [
-    { value: "educational diagram", label: "📊 EDUCATIONAL DIAGRAM" },
-    { value: "scientific illustration", label: "🔬 SCIENTIFIC ILLUSTRATION" },
-    { value: "flowchart", label: "🔀 FLOWCHART" },
-    { value: "concept map", label: "🧠 CONCEPT MAP" },
-    { value: "infographic", label: "📈 INFOGRAPHIC" },
-    { value: "3D visualization", label: "🎨 3D VISUALIZATION" },
+    { value: "educational diagram", label: "Educational Diagram", icon: "📊" },
+    { value: "scientific illustration", label: "Scientific Illustration", icon: "🔬" },
+    { value: "flowchart", label: "Vector Flowchart", icon: "🔀" },
+    { value: "concept map", label: "Concept Map", icon: "🧠" },
+    { value: "infographic", label: "Academic Infographic", icon: "📈" },
+    { value: "3D visualization", label: "3D Structural Specimen", icon: "🎨" },
   ];
 
-  const handleGenerate = async () => {
-    if (!topic.trim()) {
-      setError("Please enter a topic or concept");
+  const suggestedTopics = [
+    "Photosynthetic Electron Transport Chain",
+    "Transformer Multi-Head Attention Mechanism",
+    "DNA Replication Fork & Polymerase Dynamics",
+    "TCP Three-Way Handshake Sequence",
+    "Krebs Cycle Biochemical Reaction Steps",
+    "Von Neumann Computer Architecture"
+  ];
+
+  const handleGenerate = async (customTopic?: string) => {
+    const queryTopic = (customTopic !== undefined ? customTopic : topic).trim();
+    if (!queryTopic) {
+      setError("Please specify a concept or architectural subject");
       return;
+    }
+
+    if (customTopic) {
+      setTopic(customTopic);
     }
 
     setIsLoading(true);
     setError(null);
     setResult(null);
+    playAudioChime("click");
 
     try {
       let response: ImageGenerationResult;
 
       if (mode === "context") {
-        response = await generateImageFromContext(sessionId, topic);
+        response = await generateImageFromContext(sessionId, queryTopic);
       } else {
-        response = await generateImage(sessionId, topic, style);
+        response = await generateImage(sessionId, queryTopic, style);
       }
 
       setResult(response);
+      playAudioChime("success");
     } catch (err: unknown) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to generate image";
+        err instanceof Error ? err.message : "Failed to synthesize visual diagram";
       setError(
         (err as { response?: { data?: { detail?: string } } })?.response?.data
           ?.detail || errorMessage,
@@ -64,13 +87,22 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ sessionId }) => {
     }
   };
 
+  const handleCopyPrompt = () => {
+    if (!result?.generated_prompt) return;
+    navigator.clipboard.writeText(result.generated_prompt);
+    setCopiedPrompt(true);
+    toast.success("Prompt copied to clipboard");
+    playAudioChime("click");
+    setTimeout(() => setCopiedPrompt(false), 2000);
+  };
+
   const handleDownload = async () => {
     if (!result?.image_url && !result?.image_data) return;
 
     try {
+      playAudioChime("click");
       let url: string;
       if (result.image_data) {
-        // Handle base64 image
         const binaryString = window.atob(result.image_data);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
@@ -79,7 +111,6 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ sessionId }) => {
         const blob = new Blob([bytes], { type: "image/png" });
         url = window.URL.createObjectURL(blob);
       } else {
-        // Handle URL image
         const response = await fetch(result.image_url!);
         const blob = await response.blob();
         url = window.URL.createObjectURL(blob);
@@ -87,72 +118,94 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ sessionId }) => {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `study-image-${Date.now()}.png`;
+      const safeFilename = (topic || "academic-diagram").toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
+      a.download = `${safeFilename}-${Date.now()}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch {
-      setError("Failed to download image");
+      setError("Failed to download image file");
     }
   };
 
+  const displayImageUrl = result?.image_data
+    ? `data:image/png;base64,${result.image_data}`
+    : result?.image_url;
+
   return (
-    <div className="flex flex-col bg-white border-2 border-black shadow-neo font-sans">
-      {/* Header */}
-      <div className="p-6 border-b-2 border-black bg-neo-pink text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-white border-2 border-black shadow-neo-sm">
-            <Sparkles className="w-6 h-6 text-black fill-neo-yellow" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black uppercase text-stroke-sm drop-shadow-[2px_2px_0px_black]">
-              Image Generator
-            </h2>
-            <p className="text-white font-bold opacity-90">
-              Generate educational visuals with AI
-            </p>
+    <div className="flex flex-col bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 font-sans transition-colors p-4 sm:p-6 space-y-6">
+      
+      {/* Lightbox Modal */}
+      {lightboxOpen && displayImageUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="relative max-w-5xl max-h-[90vh] w-full flex flex-col items-center">
+            <button
+              onClick={() => setLightboxOpen(false)}
+              className="absolute -top-12 right-0 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-mono text-xs flex items-center gap-1.5 transition-colors"
+            >
+              <X size={16} /> Close
+            </button>
+            <img
+              src={displayImageUrl}
+              alt="Schematic Full View"
+              className="max-h-[85vh] max-w-full object-contain rounded-xl border border-white/20 shadow-2xl"
+            />
           </div>
         </div>
+      )}
 
-        {/* Mode Toggle */}
-        <div className="flex gap-4 mb-4">
+      {/* Control Panel Card */}
+      <div className="border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02] rounded-xl p-5 sm:p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="w-4 h-4 text-emerald-700 dark:text-cyan-400" />
+          <span className="font-mono text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold">
+            Visual Schematic Synthesis
+          </span>
+        </div>
+        <h2 className="font-garamond text-2xl sm:text-3xl font-normal tracking-tight text-slate-900 dark:text-white">
+          Technical Diagrams & Concept Visualizer
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+          Synthesizes high-resolution academic figures, vector flowcharts, and anatomical schematics to visually anchor abstract theoretical knowledge.
+        </p>
+
+        {/* Mode Selector */}
+        <div className="flex flex-wrap gap-2.5 mt-5">
           <button
-            onClick={() => setMode("topic")}
-            className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 transition-all border-2 border-black font-black uppercase ${
+            onClick={() => { setMode("topic"); playAudioChime("click"); }}
+            className={`btn-press px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all border ${
               mode === "topic"
-                ? "bg-black text-white shadow-neo-sm translate-x-[-2px] translate-y-[-2px]"
-                : "bg-white text-black hover:bg-gray-100"
+                ? "bg-emerald-50 dark:bg-cyan-950/40 border-emerald-600 dark:border-cyan-400 text-emerald-800 dark:text-cyan-300 font-bold"
+                : "bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400"
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            Any Topic
+            Universal Query Mode
           </button>
           <button
-            onClick={() => setMode("context")}
-            className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 transition-all border-2 border-black font-black uppercase ${
+            onClick={() => { setMode("context"); playAudioChime("click"); }}
+            className={`btn-press px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all border ${
               mode === "context"
-                ? "bg-black text-white shadow-neo-sm translate-x-[-2px] translate-y-[-2px]"
-                : "bg-white text-black hover:bg-gray-100"
+                ? "bg-emerald-50 dark:bg-cyan-950/40 border-emerald-600 dark:border-cyan-400 text-emerald-800 dark:text-cyan-300 font-bold"
+                : "bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400"
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            From Documents
+            Vector Document Context
           </button>
         </div>
 
-        {/* Input */}
-        <div className="space-y-3">
+        {/* Input & Action */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 mt-4">
           <input
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder={
               mode === "topic"
-                ? "ENTER ANY TOPIC (E.G., 'HOW PHOTOSYNTHESIS WORKS')"
-                : "ENTER A CONCEPT FROM YOUR DOCUMENTS"
+                ? "e.g. 'Photosynthetic Electron Transport Chain'"
+                : "Enter theorem or concept from your ingested manuscripts"
             }
-            className="w-full px-4 py-3 bg-white border-2 border-black focus:shadow-neo outline-none text-black placeholder-gray-400 font-bold"
+            className="sm:col-span-7 px-4 py-2.5 rounded-lg border border-slate-300 dark:border-white/15 bg-white dark:bg-[#0B0F17] text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 font-medium focus:outline-none focus:border-emerald-600 dark:focus:border-cyan-400"
             onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
           />
 
@@ -160,120 +213,147 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({ sessionId }) => {
             <select
               value={style}
               onChange={(e) => setStyle(e.target.value)}
-              className="w-full px-4 py-3 bg-white border-2 border-black focus:shadow-neo outline-none text-black font-bold uppercase cursor-pointer"
+              className="sm:col-span-3 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-white/15 bg-white dark:bg-[#0B0F17] text-xs font-mono font-medium text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 dark:focus:border-cyan-400 cursor-pointer"
             >
               {styleOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {opt.icon} {opt.label}
                 </option>
               ))}
             </select>
           )}
 
           <button
-            onClick={handleGenerate}
+            onClick={() => handleGenerate()}
             disabled={isLoading || !topic.trim()}
-            className="w-full py-4 bg-neo-green hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black shadow-neo hover:translate-x-[-2px] hover:translate-y-[-2px] font-black uppercase flex items-center justify-center gap-2 transition-all active:shadow-none active:translate-x-[0px] active:translate-y-[0px]"
+            className={`${mode === "topic" ? "sm:col-span-2" : "sm:col-span-5"} btn-press py-2.5 bg-emerald-700 dark:bg-cyan-400 text-white dark:text-black font-semibold text-xs rounded-lg flex items-center justify-center gap-2 shadow-sm hover:bg-emerald-800 dark:hover:bg-cyan-300 disabled:opacity-40 transition-colors`}
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                GENERATING (~30s)...
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="font-mono">Synthesizing...</span>
               </>
             ) : (
               <>
-                <Image className="w-5 h-5 stroke-2" />
-                GENERATE IMAGE
+                <ImageIcon className="w-4 h-4" />
+                <span>Generate Diagram</span>
               </>
             )}
           </button>
         </div>
+
+        {/* Suggested Concept Chips */}
+        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-white/10">
+          <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-mono font-bold mb-2">
+            <Lightbulb size={13} className="text-amber-500" />
+            <span>Suggested Concept Visualizations:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {suggestedTopics.map((sug) => (
+              <button
+                key={sug}
+                onClick={() => handleGenerate(sug)}
+                className="btn-press text-[11px] font-mono px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-slate-700 dark:text-slate-300 hover:border-emerald-600 dark:hover:border-cyan-400 hover:text-emerald-700 dark:hover:text-cyan-300 transition-colors"
+              >
+                + {sug}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Result Area */}
-      <div className="p-6 bg-white pattern-dots">
+      {/* Result Container */}
+      <div className="space-y-4">
         {error && (
-          <div className="bg-neo-red border-2 border-black text-white p-4 mb-4 flex items-start gap-3 shadow-neo-sm">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 stroke-2" />
-            <div>
-              <p className="font-black uppercase">Generation Failed</p>
-              <p className="font-medium text-sm">{error}</p>
-            </div>
+          <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 p-4 rounded-lg text-xs font-mono">
+            ⚠️ {error}
           </div>
         )}
 
         {result && (
-          <div className="space-y-4">
-            {/* Generated Image */}
-            <div className="relative group border-2 border-black shadow-neo bg-white p-2">
-              <img
-                src={
-                  result.image_data
-                    ? `data:image/png;base64,${result.image_data}`
-                    : result.image_url
-                }
-                alt={
-                  result.original_topic || result.concept || "Generated image"
-                }
-                className="w-full border-2 border-black"
-              />
-              <button
-                onClick={handleDownload}
-                className="absolute top-6 right-6 p-2 bg-white border-2 border-black hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity shadow-neo-sm"
-                title="Download Image"
-              >
-                <Download className="w-5 h-5 text-black stroke-2" />
-              </button>
+          <div className="border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0B0F17] rounded-xl p-5 shadow-sm space-y-4">
+            
+            {/* Visual Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
+              <div>
+                <span className="font-mono text-xs uppercase text-emerald-700 dark:text-cyan-400 font-bold">
+                  Synthesized Diagram
+                </span>
+                <h3 className="font-garamond text-xl font-normal text-slate-900 dark:text-white">
+                  {result.original_topic || result.concept || topic}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLightboxOpen(true)}
+                  className="btn-press p-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 hover:border-emerald-600 dark:hover:border-cyan-400 transition-colors"
+                  title="Expand to Fullscreen"
+                >
+                  <Maximize2 size={16} />
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="btn-press flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 dark:bg-cyan-400 text-white dark:text-black font-mono text-xs font-semibold shadow-sm hover:bg-emerald-800 dark:hover:bg-cyan-300 transition-colors"
+                  title="Download High-Resolution PNG"
+                >
+                  <Download size={14} />
+                  <span>Download PNG</span>
+                </button>
+              </div>
             </div>
 
-            {/* Info Card */}
-            <div className="bg-white border-2 border-black shadow-neo-sm p-4 space-y-3">
-              <div className="flex items-start gap-2">
-                <Info className="w-5 h-5 text-neo-blue flex-shrink-0 mt-1 stroke-2" />
-                <div>
-                  <p className="text-gray-500 text-xs font-black uppercase">
-                    Generated Prompt:
-                  </p>
-                  <p className="text-black text-sm font-medium">
-                    {result.generated_prompt}
-                  </p>
-                </div>
-              </div>
+            {/* Image Preview */}
+            <div className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-900/5 dark:bg-black/40 flex items-center justify-center p-3">
+              <img
+                src={displayImageUrl}
+                alt={result.original_topic || result.concept || "Generated diagram"}
+                className="w-full max-h-[520px] object-contain rounded-lg shadow-sm cursor-zoom-in"
+                onClick={() => setLightboxOpen(true)}
+              />
+            </div>
 
-              {result.context_used && (
-                <div className="border-t-2 border-black pt-3 border-dashed">
-                  <p className="text-gray-500 text-xs font-black uppercase mb-1">
-                    Context Used:
-                  </p>
-                  <p className="text-gray-800 text-sm font-medium">
-                    {result.context_used}
-                  </p>
+            {/* Prompt & Metadata Section */}
+            <div className="p-4 rounded-lg bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 space-y-2 text-xs font-mono">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 flex-1">
+                  <Info className="w-4 h-4 text-emerald-700 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400 font-bold uppercase">Synthesized Prompt: </span>
+                    <span className="text-slate-700 dark:text-slate-300">{result.generated_prompt}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCopyPrompt}
+                  className="btn-press p-1.5 rounded border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/[0.06] text-slate-600 dark:text-slate-300 flex-shrink-0"
+                  title="Copy Prompt"
+                >
+                  {copiedPrompt ? <Check size={14} className="text-emerald-600 dark:text-cyan-400" /> : <Copy size={14} />}
+                </button>
+              </div>
+              {result.note && (
+                <div className="text-[11px] text-amber-600 dark:text-amber-400 pt-1 border-t border-slate-200 dark:border-white/5">
+                  ✦ {result.note}
                 </div>
               )}
-
-              <div className="text-xs font-bold text-black bg-neo-yellow border-2 border-black p-2 shadow-neo-sm">
-                ⚠️ {result.note}
-              </div>
             </div>
           </div>
         )}
 
         {!result && !error && !isLoading && (
-          <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
-            <div className="bg-white p-4 border-2 border-black shadow-neo mb-4">
-              <Image className="w-16 h-16 text-black stroke-1" />
+          <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-slate-200 dark:border-white/10 rounded-xl bg-slate-50/50 dark:bg-white/[0.01]">
+            <div className="w-14 h-14 rounded-full bg-white dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-4 shadow-sm">
+              <ImageIcon size={24} />
             </div>
-            <p className="text-xl font-black uppercase text-black mb-2">
-              No Image Generated Yet
-            </p>
-            <p className="text-sm font-bold text-gray-600 max-w-md">
-              {mode === "topic"
-                ? "ENTER ANY TOPIC AND SELECT A STYLE TO GENERATE AN EDUCATIONAL VISUAL."
-                : "ENTER A CONCEPT FROM YOUR UPLOADED DOCUMENTS TO GENERATE A RELEVANT IMAGE."}
+            <h4 className="font-garamond text-2xl font-normal text-slate-900 dark:text-white mb-1">
+              Visual Schematic Synthesis Ready
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-md font-normal leading-relaxed">
+              Enter any academic concept above or pick a suggested topic to generate a high-resolution technical schematic, flowchart, or scientific concept map.
             </p>
           </div>
         )}
       </div>
+
     </div>
   );
 };

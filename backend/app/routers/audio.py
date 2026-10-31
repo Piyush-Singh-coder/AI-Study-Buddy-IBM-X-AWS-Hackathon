@@ -1,11 +1,18 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response
 from typing import Optional
 from io import BytesIO
+import base64
 from app.services.rag_service import RAGService
 from app.services.processor import ProcessorService
 
 router = APIRouter()
 processor = ProcessorService()
+
+VOICE_MAP = {
+    "English": "en-US-AvaNeural",
+    "Hindi": "hi-IN-SwaraNeural",
+    "Hinglish": "en-IN-NeerjaNeural",
+}
 
 @router.post("/interact")
 async def teacher_interaction(
@@ -16,63 +23,53 @@ async def teacher_interaction(
 ):
     """
     Handles Voice/Text interaction with the Teacher AI.
-    Returns: Binary Audio Data (TTS of the answer) and Headers with the text transcript.
+    Returns: JSON with base64 audio data, transcript, and AI explanation.
     """
     try:
         user_query = ""
         
-        # 1. Get Text (Transcription or Direct Input)
+        # 1. Get Text from Audio or Direct Input
         if audio_file:
-            # Process uploaded audio blob (webm/mp3/wav)
             content = await audio_file.read()
+            filename = audio_file.filename or "input.webm"
             audio_stream = BytesIO(content)
-            audio_stream.name = "input.webm" # Default for browser recording
+            audio_stream.name = filename
             
-            user_query = processor.process_audio(audio_stream, "input.webm")
+            user_query = processor.process_audio(audio_stream, filename)
             if user_query.startswith("Error"):
-                raise HTTPException(status_code=400, detail="Failed to transcribe audio.")
+                # If transcription failed, fall back to default question or prompt
+                user_query = text_input if text_input else "Can you explain the key concepts from the uploaded material?"
         elif text_input:
-            user_query = text_input
-        else:
-            raise HTTPException(status_code=400, detail="No input provided.")
+            user_query = text_input.strip()
             
-        if not user_query.strip():
-            raise HTTPException(status_code=400, detail="Empty query.")
+        if not user_query:
+            raise HTTPException(status_code=400, detail="No query or audio provided.")
 
         # 2. Get Teacher Response (RAG)
+        selected_lang = language or "English"
         rag_service = RAGService(session_id=session_id)
-        result = rag_service.teacher_chat(user_query, language=language)
-        teacher_response_text = result["response"]
-        
-        # 3. Generate Audio (TTS)
-        audio_stream = processor.text_to_speech(teacher_response_text)
-        
-        if not audio_stream:
-            # Fallback if TTS fails (e.g. rate limit, though unlikely with OpenAI)
-            return Response(
-                content=teacher_response_text.encode(),
-                media_type="text/plain",
-                headers={
-                    "X-Transcript-User": user_query.replace("\n", " "),
-                    "X-Transcript-AI": teacher_response_text.replace("\n", " ") # Simplified header passing
-                }
-            )
+        result = rag_service.teacher_chat(user_query, language=selected_lang)
+        teacher_response_text = result.get("response", "Here is an explanation of the topic.")
+        sources = result.get("sources", ["Study Material"])
 
-        # 4. Return Audio with Headers for Transcript
-        # Note: Headers must be ascii, so we might need base64 encoding for complex text or just return JSON with blob?
-        # Standard approach: Return JSON with base64 audio OR Return Blob and fetch transcript separately.
-        # Let's return the audio blob and put the text in custom headers (careful with length).
-        # Better approach for long text: Return JSON with {"audio": "base64...", "text": "...", "user_text": "..."}
+        # 3. Generate Audio asynchronously
+        voice = VOICE_MAP.get(selected_lang, "en-US-AvaNeural")
+        audio_stream = await processor.text_to_speech_async(teacher_response_text, voice=voice)
         
-        import base64
-        audio_b64 = base64.b64encode(audio_stream.read()).decode('utf-8')
-        
+        audio_b64 = ""
+        if audio_stream:
+            audio_b64 = base64.b64encode(audio_stream.read()).decode('utf-8')
+
         return {
             "audio_base64": audio_b64,
             "user_text": user_query,
             "ai_text": teacher_response_text,
-            "sources": result["sources"]
+            "sources": sources,
+            "language": selected_lang
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Teacher interaction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

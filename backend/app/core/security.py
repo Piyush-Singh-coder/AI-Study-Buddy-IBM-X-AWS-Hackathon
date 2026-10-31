@@ -44,16 +44,26 @@ def decode_access_token(token: str) -> Optional[dict]:
     except Exception:
         return None
 
-def get_current_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> str:
-    """Extracts user_id from token header. Returns anonymous fallback if no token passed for backwards compatibility."""
+def get_authenticated_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> str:
+    """
+    Strict authentication dependency.
+    Requires a valid JWT bearer token. Raises HTTP 401 if token is missing, invalid, or expired.
+    """
     if not token:
-        # Fallback for unauthenticated dev calls
-        return "anonymous_user"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please sign in or register to create and access study sessions.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     payload = decode_access_token(token)
     if not payload or "sub" not in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired authentication token",
+            detail="Invalid or expired session token. Please sign in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return payload["sub"]
+
+def get_current_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> str:
+    """Alias for backwards compatibility with authenticated user enforcement."""
+    return get_authenticated_user_id(token)

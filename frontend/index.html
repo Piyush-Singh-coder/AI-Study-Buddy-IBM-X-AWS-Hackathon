@@ -1,12 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Study Buddy</title>
+    <title>AI Study Buddy — Cognitive Scholar & RAG Engine</title>
+
+    <!-- Google Fonts: EB Garamond, Figtree, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Figtree:ital,wght@0,300..900;1,300..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Anti-flicker Theme Initializer -->
+    <script>
+      (function() {
+        const storedTheme = localStorage.getItem('study_theme') || localStorage.getItem('folio_theme');
+        if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+    </script>
   </head>
-  <body>
+  <body class="bg-alabaster-canvas dark:bg-obsidian-canvas text-alabaster-primary dark:text-obsidian-primary min-h-screen flex flex-col relative selection:bg-alabaster-pill dark:selection:bg-obsidian-cyan/20 selection:text-alabaster-primary dark:selection:text-obsidian-cyan custom-scrollbar">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

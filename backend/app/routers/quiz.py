@@ -13,7 +13,7 @@ class QuizRequest(BaseModel):
     session_id: str
     topic: Optional[str] = "general"
     difficulty: Optional[str] = Field(default="medium", description="easy, medium, or hard")
-    num_questions: Optional[int] = Field(default=5, ge=5, le=50)
+    num_questions: Optional[int] = Field(default=5, ge=1, le=50)
 
 class SummaryRequest(BaseModel):
     session_id: str

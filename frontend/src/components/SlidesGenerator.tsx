@@ -1,14 +1,15 @@
 import React, { useState } from "react";
 import {
-  Presentation,
   Loader2,
-  Download,
-  BookOpen,
-  AlertCircle,
-  FileText,
   CheckCircle2,
+  Sparkles,
+  Presentation,
+  Palette,
+  Layers,
+  FileCheck
 } from "lucide-react";
 import { generateSlides } from "../services/api";
+import { playAudioChime } from "../utils/theme";
 
 interface SlidesGeneratorProps {
   sessionId: string;
@@ -17,28 +18,45 @@ interface SlidesGeneratorProps {
 const SlidesGenerator: React.FC<SlidesGeneratorProps> = ({ sessionId }) => {
   const [topic, setTopic] = useState("");
   const [numSlides, setNumSlides] = useState(5);
+  const [styleTheme, setStyleTheme] = useState<"oxford" | "obsidian" | "clean">("oxford");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const suggestedTopics = [
+    "Core Thesis & Theoretical Framework",
+    "Experimental Methodology & Results",
+    "Literature Review & Related Works",
+    "Key Conclusions & Research Impact"
+  ];
+
   const handleGenerate = async () => {
     if (!topic.trim()) {
-      setError("Please enter a topic for your presentation");
+      setError("Please specify a presentation topic");
       return;
     }
 
     setIsLoading(true);
     setError(null);
     setSuccess(false);
+    playAudioChime("click");
 
     try {
-      // Trigger download directly
-      await generateSlides(sessionId, topic, numSlides);
+      const blob = await generateSlides(sessionId, topic.trim(), numSlides);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${topic.trim().replace(/\s+/g, "_")}_Presentation.pptx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      playAudioChime("success");
       setSuccess(true);
-      setTopic("");
     } catch (err: unknown) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to generate slides";
+        err instanceof Error ? err.message : "Failed to synthesize slide deck.";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -46,116 +64,145 @@ const SlidesGenerator: React.FC<SlidesGeneratorProps> = ({ sessionId }) => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-2 border-black shadow-neo font-sans">
+    <div className="h-full flex flex-col bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 font-sans p-4 sm:p-6 space-y-6 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm transition-colors">
+      
       {/* Header */}
-      <div className="p-6 border-b-2 border-black bg-neo-purple text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-white border-2 border-black shadow-neo-sm">
-            <Presentation className="w-6 h-6 text-black fill-neo-yellow" />
+      <div className="border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02] rounded-xl p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="w-4 h-4 text-emerald-700 dark:text-cyan-400" />
+          <span className="font-mono text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold">
+            Executive Presentation Synthesizer
+          </span>
+        </div>
+        <h2 className="font-garamond text-3xl font-normal tracking-tight text-slate-900 dark:text-white">
+          Academic Slides & Lecture Deck Creator
+        </h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+          Transforms ingested manuscripts, book chapters, and research data into clean, structured PowerPoint (.pptx) presentations with speaker notes and conceptual breakdowns.
+        </p>
+      </div>
+
+      {/* Main Configuration Card */}
+      <div className="max-w-3xl mx-auto w-full border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.02] rounded-xl p-6 sm:p-8 shadow-sm space-y-6">
+        
+        {/* Presentation Topic */}
+        <div>
+          <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+            Presentation Subject / Chapter Focus
+          </label>
+          <input
+            type="text"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="e.g. 'Quantum Neural Networks', 'Modernist Architecture'"
+            className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] text-sm text-slate-900 dark:text-white placeholder:text-slate-400 font-medium focus:outline-none focus:border-emerald-600 dark:focus:border-cyan-400"
+          />
+          
+          {/* Quick suggestions */}
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
+            <span className="text-[11px] font-mono text-slate-500 self-center mr-1">Suggestions:</span>
+            {suggestedTopics.map((s, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => { setTopic(s); playAudioChime("click"); }}
+                className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-emerald-600 dark:hover:border-cyan-400"
+              >
+                {s}
+              </button>
+            ))}
           </div>
+        </div>
+
+        {/* Deck Style & Length */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <h2 className="text-2xl font-black uppercase text-stroke-sm drop-shadow-[2px_2px_0px_black]">
-              Slide Generator
-            </h2>
-            <p className="text-white font-bold opacity-90">
-              Create PowerPoint presentations from your study materials
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto p-6 bg-white pattern-dots flex items-center justify-center">
-        <div className="w-full max-w-2xl">
-          {/* Card */}
-          <div className="bg-white border-2 border-black shadow-neo p-8 space-y-6">
-            <div className="space-y-2">
-              <label className="text-lg font-black uppercase flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                Presentation Topic
-              </label>
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="E.G., 'THE RISE OF ROME', 'QUANTUM PHYSICS BASICS'"
-                className="w-full px-4 py-3 bg-white border-2 border-black focus:shadow-neo outline-none text-black placeholder-gray-400 font-bold"
-              />
-              <p className="text-sm font-bold text-gray-500">
-                Based on your uploaded documents context.
-              </p>
+            <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+              <Palette size={14} className="text-emerald-700 dark:text-cyan-400" />
+              <span>Deck Typographic Theme</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: "oxford", name: "Oxford", desc: "Editorial Serif" },
+                { id: "obsidian", name: "Obsidian", desc: "Dark Tech" },
+                { id: "clean", name: "Modern", desc: "Minimalist" },
+              ].map((th) => (
+                <button
+                  key={th.id}
+                  type="button"
+                  onClick={() => { setStyleTheme(th.id as any); playAudioChime("click"); }}
+                  className={`btn-press p-2.5 rounded-lg border text-left flex flex-col justify-between transition-all ${
+                    styleTheme === th.id
+                      ? "bg-emerald-50 dark:bg-cyan-950/40 border-emerald-700 dark:border-cyan-400 text-emerald-950 dark:text-cyan-300 shadow-sm"
+                      : "bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  <span className="font-mono text-xs font-bold">{th.name}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">{th.desc}</span>
+                </button>
+              ))}
             </div>
-
-            <div className="space-y-2">
-              <label className="text-lg font-black uppercase flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Number of Slides
-              </label>
-              <div className="flex gap-4">
-                {[5, 10, 15].map((num) => (
-                  <button
-                    key={num}
-                    onClick={() => setNumSlides(num)}
-                    className={`flex-1 py-3 px-4 border-2 border-black font-black uppercase transition-all ${
-                      numSlides === num
-                        ? "bg-black text-white shadow-neo-sm translate-x-[-2px] translate-y-[-2px]"
-                        : "bg-white text-black hover:bg-gray-100"
-                    }`}
-                  >
-                    {num} Slides
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {error && (
-              <div className="bg-neo-red border-2 border-black text-white p-4 flex items-start gap-3 shadow-neo-sm">
-                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 stroke-2" />
-                <div>
-                  <p className="font-black uppercase">Generation Failed</p>
-                  <p className="font-medium text-sm">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-neo-green border-2 border-black text-black p-4 flex items-start gap-3 shadow-neo-sm">
-                <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 stroke-2" />
-                <div>
-                  <p className="font-black uppercase">Success!</p>
-                  <p className="font-bold text-sm">
-                    Your presentation has been downloaded.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={handleGenerate}
-              disabled={isLoading || !topic.trim()}
-              className="w-full py-4 bg-neo-yellow hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black shadow-neo hover:translate-x-[-2px] hover:translate-y-[-2px] font-black uppercase flex items-center justify-center gap-2 transition-all active:shadow-none active:translate-x-[0px] active:translate-y-[0px] text-xl"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  GENERATING PPTX...
-                </>
-              ) : (
-                <>
-                  <Download className="w-6 h-6 stroke-2" />
-                  GENERATE PRESENTATION
-                </>
-              )}
-            </button>
           </div>
 
-          <div className="mt-8 text-center">
-            <div className="text-center text-xs text-gray-500 font-bold tracking-widest mt-6 pb-2">
-              POWERED BY OPENAI (GPT-4o) & PYTHON-PPTX
+          <div>
+            <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+              <Layers size={14} className="text-emerald-700 dark:text-cyan-400" />
+              <span>Slide Deck Depth</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[5, 10, 15].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => { setNumSlides(num); playAudioChime("click"); }}
+                  className={`btn-press py-2.5 px-3 rounded-lg border text-xs font-mono font-semibold transition-all ${
+                    numSlides === num
+                      ? "bg-emerald-50 dark:bg-cyan-950/40 border-emerald-700 dark:border-cyan-400 text-emerald-950 dark:text-cyan-300 font-bold shadow-sm"
+                      : "bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {num} Slides
+                </button>
+              ))}
             </div>
           </div>
         </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 p-4 rounded-lg text-xs font-mono">
+            ⚠️ {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 p-4 rounded-lg text-xs font-mono flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-600" />
+              <span>PowerPoint (.pptx) synthesized and downloaded successfully.</span>
+            </div>
+            <FileCheck size={16} className="text-emerald-600" />
+          </div>
+        )}
+
+        <button
+          onClick={handleGenerate}
+          disabled={isLoading || !topic.trim()}
+          className="btn-press w-full py-3.5 bg-emerald-800 dark:bg-cyan-500 text-white dark:text-slate-950 font-semibold text-xs rounded-lg flex items-center justify-center gap-2 shadow-sm hover:bg-emerald-900 dark:hover:bg-cyan-400 disabled:opacity-40 transition-all"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="animate-spin" size={16} />
+              <span className="font-mono text-xs">Synthesizing {numSlides} Slides with Gemini & python-pptx...</span>
+            </>
+          ) : (
+            <>
+              <Presentation size={16} />
+              <span>Generate & Download Slide Deck (.pptx) →</span>
+            </>
+          )}
+        </button>
       </div>
+
     </div>
   );
 };

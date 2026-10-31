@@ -1,7 +1,17 @@
 import axios from "axios";
 
+// Helper to reliably compute API base URL across local dev, Render, and Vercel
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!envUrl || envUrl.trim() === "") {
+    return "/api";
+  }
+  const clean = envUrl.trim().replace(/\/+$/, "");
+  return clean.endsWith("/api") ? clean : `${clean}/api`;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
@@ -16,6 +26,22 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Interceptor to handle auth expiry
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const url = error.config?.url || "";
+      if (!url.includes("/auth/login") && !url.includes("/auth/register")) {
+        console.warn("Session expired or unauthorized request");
+        localStorage.removeItem("study_auth_token");
+        localStorage.removeItem("study_user");
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Auth API calls
 export const registerApi = async (email: string, password: string) => {
@@ -37,7 +63,7 @@ export const getMeApi = async () => {
 export const getUserId = (): string => {
   let userId = localStorage.getItem("study_user_id");
   if (!userId) {
-    userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+    userId = `user_${Math.random().toString(36).substring(2, 11)}`;
     localStorage.setItem("study_user_id", userId);
   }
   return userId;
@@ -45,7 +71,11 @@ export const getUserId = (): string => {
 
 // Session Management
 export const createSession = async () => {
-  const userId = getUserId();
+  const token = localStorage.getItem("study_auth_token");
+  if (!token) {
+    throw new Error("Authentication required: Please sign in or register to create a study session.");
+  }
+  const userId = localStorage.getItem("study_user_id") || "auth_user";
   const response = await api.post("/session/create", { user_id: userId });
   const sessionId = response.data?.session_id || response.data;
   if (typeof sessionId === "string") {
@@ -81,10 +111,19 @@ export const getSessionDocuments = async (sessionId: any) => {
   return response.data;
 };
 
+export const claimSessionsApi = async (anonUserId: string) => {
+  const response = await api.post("/session/claim", { anon_user_id: anonUserId });
+  return response.data;
+};
+
 // Study Material Processing
 export const uploadFile = async (file: File, sessionId: string) => {
+  const token = localStorage.getItem("study_auth_token");
+  if (!token) {
+    throw new Error("Authentication required: Please sign in or register before uploading documents.");
+  }
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("files", file);
   formData.append("session_id", sessionId);
 
   const response = await api.post("/upload/", formData, {
@@ -105,6 +144,10 @@ export const uploadFiles = async (files: FileList | File[], sessionId: string) =
   return results;
 };
 
+// Helper to check for standard UUID pattern
+const isUUID = (str: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+
 // RAG Features
 export const sendChatMessage = async (query: string, sessionId: string) => {
   const response = await api.post("/chat/", {
@@ -114,7 +157,19 @@ export const sendChatMessage = async (query: string, sessionId: string) => {
   return response.data;
 };
 
-export const chat = async (sessionId: string, query: string) => {
+// Robust chat supporting either (sessionId, query) or (query, sessionId)
+export const chat = async (arg1: string, arg2: string) => {
+  let query = arg1;
+  let sessionId = arg2;
+
+  if (isUUID(arg1) && !isUUID(arg2)) {
+    sessionId = arg1;
+    query = arg2;
+  } else if (!isUUID(arg1) && isUUID(arg2)) {
+    query = arg1;
+    sessionId = arg2;
+  }
+
   return sendChatMessage(query, sessionId);
 };
 
@@ -229,21 +284,24 @@ export const interactTeacher = async (
   let language: string = "English";
   let audioFile: Blob | undefined = undefined;
 
-  if (typeof arg2 === "string") {
-    textInput = arg2;
-  } else if (arg2 instanceof Blob) {
-    audioFile = arg2;
-  }
+  const parseArg = (val: any) => {
+    if (!val) return;
+    if (val instanceof Blob) {
+      audioFile = val;
+    } else if (typeof val === "string") {
+      if (["English", "Hindi", "Hinglish"].includes(val)) {
+        language = val;
+      } else if (!textInput) {
+        textInput = val;
+      } else {
+        language = val;
+      }
+    }
+  };
 
-  if (typeof arg3 === "string") {
-    language = arg3;
-  } else if (arg3 instanceof Blob) {
-    audioFile = arg3;
-  }
-
-  if (arg4 instanceof Blob) {
-    audioFile = arg4;
-  }
+  parseArg(arg2);
+  parseArg(arg3);
+  parseArg(arg4);
 
   const formData = new FormData();
   formData.append("session_id", sessionId);
@@ -303,6 +361,7 @@ export interface ImageGenerationResult {
   original_topic?: string;
   concept?: string;
   generated_prompt?: string;
+  prompt_used?: string;
   context_used?: string;
   note?: string;
   topic?: string;
@@ -310,32 +369,45 @@ export interface ImageGenerationResult {
 }
 
 export const generateEducationalDiagram = async (
-  prompt: string,
-  topic?: string
+  sessionId: string,
+  topic: string,
+  style: string = "educational diagram"
 ): Promise<ImageGenerationResult> => {
-  const response = await api.post("/image/generate", {
-    prompt,
-    topic: topic || "Educational Diagram",
+  const formData = new FormData();
+  formData.append("session_id", sessionId);
+  formData.append("topic", topic);
+  formData.append("style", style);
+
+  const response = await api.post("/image/generate", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   });
   return response.data;
 };
 
 export const generateImage = async (
-  prompt: string,
-  topic?: string,
-  sessionId?: string
+  sessionId: string,
+  topic: string,
+  style?: string
 ): Promise<ImageGenerationResult> => {
-  return generateEducationalDiagram(prompt, topic || sessionId || "Educational Diagram");
+  return generateEducationalDiagram(sessionId, topic, style || "educational diagram");
 };
 
 export const generateImageFromContext = async (
-  arg1: string,
-  arg2?: string,
-  arg3?: string
+  sessionId: string,
+  concept: string
 ): Promise<ImageGenerationResult> => {
-  const prompt = arg2 || arg1;
-  const topic = arg3 || "Context Diagram";
-  return generateEducationalDiagram(prompt, topic);
+  const formData = new FormData();
+  formData.append("session_id", sessionId);
+  formData.append("concept", concept);
+
+  const response = await api.post("/image/generate-from-context", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
 };
 
 // System Models Status
@@ -346,6 +418,11 @@ export const getModelsStatus = async () => {
 
 export const getModels = async () => {
   return getModelsStatus();
+};
+
+export const selectModelApi = async (provider: string, modelId?: string) => {
+  const response = await api.post("/models/select", { provider, model_id: modelId });
+  return response.data;
 };
 
 export default api;

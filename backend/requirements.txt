@@ -17,7 +17,8 @@ langchain-text-splitters
 openai
 pyjwt
 passlib[bcrypt]
-edge-tts
+edge-tts>=7.3.1
+gTTS
 pydantic
 pydantic-settings
 pypdf

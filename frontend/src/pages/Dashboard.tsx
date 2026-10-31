@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Toaster } from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import {
   MessageSquare,
   FileText,
@@ -9,8 +9,15 @@ import {
   Plus,
   Files,
   Volume2,
-  Image,
+  Image as ImageIcon,
   Presentation,
+  Trash2,
+  Cpu,
+  UserCheck,
+  Upload,
+  CheckCircle2,
+  Sun,
+  Moon
 } from "lucide-react";
 import Chat from "../components/Chat";
 import Quiz from "../components/Quiz";
@@ -20,57 +27,91 @@ import Teacher from "../components/Teacher";
 import ImageGenerator from "../components/ImageGenerator";
 import SlidesGenerator from "../components/SlidesGenerator";
 import ModelInfo from "../components/ModelInfo";
-import { useNavigate, useLocation } from "react-router-dom";
-import { deleteSession, getSessionHistory } from "../services/api";
+import AuthModal from "../components/AuthModal";
+import UploadModal from "../components/UploadModal";
+import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import { deleteSession, getSessionHistory, getSessionDocuments } from "../services/api";
+import { playAudioChime } from "../utils/theme";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<
-    | "chat"
     | "summary"
     | "quiz"
+    | "chat"
+    | "slides"
     | "sample_paper"
     | "teacher"
     | "image"
-    | "slides"
     | "models"
   >("summary");
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout, isLoaded } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [sessionHistory, setSessionHistory] = useState<any[]>([]);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [sessionDocuments, setSessionDocuments] = useState<string[]>([]);
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["summary"]));
   const currentSessionId = localStorage.getItem("study_session_id");
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const history = await getSessionHistory();
-        setSessionHistory(history);
-      } catch (e) {
-        console.error("Failed to fetch history", e);
-      }
-    };
-    fetchHistory();
-  }, []);
+  const handleSelectTab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setVisitedTabs((prev) => new Set(prev).add(tab));
+    playAudioChime("click");
+  };
 
-  // Dashboard content is ready because Home page waits for RAG creation
-  useEffect(() => {
-    // Quick check to update sessions list if needed
-    const fetchHistory = async () => {
-      try {
-        const history = await getSessionHistory();
-        setSessionHistory(history);
-      } catch (e) {
-        console.error("Failed to fetch history", e);
+  const toggleCurrentTheme = () => {
+    toggleTheme();
+  };
+
+  const currentSessionRecord = sessionHistory.find((s) => s.id === currentSessionId);
+
+  const fetchHistory = async () => {
+    if (!user) return;
+    try {
+      const history = await getSessionHistory();
+      setSessionHistory(history || []);
+      if (!localStorage.getItem("study_session_id") && history && history.length > 0) {
+        localStorage.setItem("study_session_id", history[0].id);
       }
-    };
-    fetchHistory();
-  }, [location.state]);
+    } catch (e) {
+      console.error("Failed to fetch history", e);
+    }
+  };
+
+  const fetchDocuments = async () => {
+    if (!user) return;
+    const sid = localStorage.getItem("study_session_id");
+    if (sid) {
+      try {
+        const data = await getSessionDocuments(sid);
+        if (data && data.documents) {
+          setSessionDocuments(data.documents);
+        }
+      } catch (e) {
+        console.error("Failed to load documents", e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchHistory();
+      fetchDocuments();
+    }
+  }, [user, location.state, currentSessionId]);
 
   const handleEndSession = async () => {
     const sessionId = localStorage.getItem("study_session_id");
     if (sessionId) {
       try {
         await deleteSession(sessionId);
+        toast.success("Session deleted successfully");
         setSessionHistory((prev) => prev.filter((s) => s.id !== sessionId));
       } catch (err) {
         console.error("Failed to delete session:", err);
@@ -80,212 +121,401 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  const switchSession = (sessionId: string) => {
-    localStorage.setItem("study_session_id", sessionId);
-    window.location.reload(); // Quick way to reset all states and components
+  const handleDeleteHistorySession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    try {
+      await deleteSession(sessionId);
+      toast.success("Session deleted");
+      setSessionHistory((prev) => prev.filter((s) => s.id !== sessionId));
+      if (currentSessionId === sessionId) {
+        localStorage.removeItem("study_session_id");
+        window.location.reload();
+      }
+    } catch (err) {
+      toast.error("Failed to delete session");
+    }
   };
 
+  const switchSession = (sessionId: string) => {
+    localStorage.setItem("study_session_id", sessionId);
+    playAudioChime("click");
+    window.location.reload();
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-alabaster-canvas dark:bg-obsidian-canvas flex flex-col items-center justify-center p-6 text-slate-900 dark:text-slate-100 transition-colors">
+        <div className="relative flex flex-col items-center max-w-sm text-center">
+          {/* Orbital glowing badge */}
+          <div className="relative mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-white dark:bg-[#0B0F17] border border-slate-200 dark:border-white/15 flex items-center justify-center shadow-lg font-garamond text-2xl font-bold text-slate-900 dark:text-cyan-400">
+              F
+            </div>
+            <div className="absolute -inset-2 rounded-2xl border border-emerald-600/30 dark:border-cyan-400/30 animate-ping pointer-events-none"></div>
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 font-mono text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-cyan-400 mb-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-cyan-400 animate-pulse"></span>
+            Cognitive Scholar Initializer
+          </div>
+
+          <h3 className="font-garamond text-2xl font-normal tracking-tight text-slate-900 dark:text-white">
+            Calibrating Vector Memory
+          </h3>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed font-mono">
+            Connecting to Neon PGVector & Gemini Embedding Space...
+          </p>
+
+          {/* Shimmer progress bar */}
+          <div className="w-48 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full mt-6 overflow-hidden relative">
+            <div className="h-full bg-emerald-700 dark:bg-cyan-400 rounded-full w-1/2 animate-indeterminate"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-alabaster-canvas dark:bg-obsidian-canvas flex items-center justify-center p-6 font-sans relative">
+        <Toaster position="top-right" />
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => {
+            setAuthModalOpen(false);
+            fetchHistory();
+          }}
+          initialMode={authMode}
+        />
+        <div className="bg-alabaster-card dark:bg-obsidian-elevated border border-alabaster-border dark:border-obsidian-border p-8 md:p-12 rounded-xl shadow-[0_8px_40px_rgba(20,53,39,0.15)] dark:shadow-[0_8px_40px_rgba(0,0,0,0.6)] max-w-lg w-full text-center space-y-6">
+          <div className="w-14 h-14 rounded-xl bg-alabaster-primary dark:bg-white/[0.08] text-alabaster-card dark:text-obsidian-cyan mx-auto flex items-center justify-center font-garamond text-2xl font-bold border border-alabaster-primary/30 dark:border-obsidian-cyan/30">
+            F
+          </div>
+          <div>
+            <h2 className="font-garamond text-3xl font-normal tracking-tight text-alabaster-primary dark:text-obsidian-primary">
+              Authentication Required
+            </h2>
+            <p className="text-sm text-alabaster-secondary dark:text-obsidian-secondary mt-2 leading-relaxed">
+              Please register or sign in to access your study sessions, document vector indices, AI quizzes, and socratic tutor.
+            </p>
+          </div>
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={() => {
+                setAuthMode("register");
+                setAuthModalOpen(true);
+                playAudioChime("click");
+              }}
+              className="btn-press w-full py-3.5 bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas font-semibold text-sm rounded-lg shadow-sm hover:bg-alabaster-accentHover dark:hover:bg-obsidian-cyanHover"
+            >
+              Create Free Scholar Account
+            </button>
+            <button
+              onClick={() => {
+                setAuthMode("login");
+                setAuthModalOpen(true);
+                playAudioChime("click");
+              }}
+              className="btn-press w-full py-3 bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary font-semibold text-sm rounded-lg border border-alabaster-border dark:border-obsidian-border hover:bg-alabaster-card"
+            >
+              Sign In to Existing Account
+            </button>
+            <button
+              onClick={() => navigate("/")}
+              className="w-full py-2 text-xs font-mono text-alabaster-muted dark:text-obsidian-muted hover:text-alabaster-primary dark:hover:text-obsidian-primary"
+            >
+              ← Return to Academic Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen bg-neo-yellow overflow-hidden font-sans">
-      <Toaster />
+    <div className="flex h-screen bg-alabaster-canvas dark:bg-obsidian-canvas text-alabaster-primary dark:text-obsidian-primary overflow-hidden font-sans transition-colors">
+      <Toaster position="top-right" />
+      <AuthModal isOpen={authModalOpen} onClose={() => { setAuthModalOpen(false); fetchHistory(); }} initialMode={authMode} />
+      <UploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        existingDocNames={sessionDocuments}
+        onUploadSuccess={() => { fetchDocuments(); fetchHistory(); }}
+      />
+
       {/* Sidebar */}
       <div
-        className={`${isSidebarOpen ? "w-64" : "w-20"} bg-white border-r-4 border-black transition-all duration-300 flex flex-col z-20`}
+        className={`${isSidebarOpen ? "w-64" : "w-20"} bg-alabaster-card dark:bg-obsidian-elevated border-r border-alabaster-border dark:border-obsidian-border transition-all duration-200 flex flex-col z-20 shadow-sm`}
       >
-        <div className="p-6 flex items-center justify-between border-b-4 border-black bg-neo-purple text-white">
-          {isSidebarOpen && (
-            <h1 className="text-xl font-black uppercase tracking-wider text-stroke-sm drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-              <a href="/">Study Buddy</a>
-            </h1>
+        {/* Brand header */}
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-alabaster-border dark:border-obsidian-border bg-alabaster-inset/40 dark:bg-white/[0.02]">
+          {isSidebarOpen ? (
+            <Link to="/" onClick={() => playAudioChime("click")} className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-md bg-alabaster-primary dark:bg-white/[0.08] text-alabaster-card dark:text-obsidian-cyan flex items-center justify-center font-garamond text-base font-bold border border-alabaster-primary/30 dark:border-obsidian-cyan/30">
+                F
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-sm tracking-tight text-alabaster-primary dark:text-obsidian-primary">
+                  STUDY BUDDY
+                </span>
+                <span className="text-[9px] font-mono uppercase tracking-wider text-alabaster-muted dark:text-obsidian-muted">
+                  Cognitive Scholar
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <div className="w-7 h-7 rounded-md bg-alabaster-primary dark:bg-white/[0.08] text-alabaster-card dark:text-obsidian-cyan flex items-center justify-center font-garamond text-base font-bold mx-auto">
+              F
+            </div>
           )}
           <button
-            onClick={() => setSidebarOpen(!isSidebarOpen)}
-            className="p-2 bg-white text-black border-2 border-black shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+            onClick={() => { setSidebarOpen(!isSidebarOpen); playAudioChime("click"); }}
+            className="btn-press p-1.5 rounded-md border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-secondary dark:text-obsidian-secondary hover:text-alabaster-primary dark:hover:text-obsidian-primary transition-colors"
+            title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
           >
-            <Menu size={20} className="stroke-2" />
+            <Menu size={16} />
           </button>
         </div>
 
-        {/* Scrollable middle section */}
-        <div className="flex-1 overflow-y-auto">
-          <nav className="px-4 space-y-3 mt-6">
+        {/* Scrollable middle */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {/* User Account pill */}
+          <div className="p-3 border-b border-alabaster-divider dark:border-obsidian-border bg-alabaster-inset/30 dark:bg-white/[0.01]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 truncate">
+                <UserCheck size={16} className="text-alabaster-accent dark:text-obsidian-mint flex-shrink-0" />
+                {isSidebarOpen && (
+                  <span className="text-xs font-mono font-medium truncate max-w-[130px] text-alabaster-primary dark:text-obsidian-primary" title={user.email}>
+                    {user.email}
+                  </span>
+                )}
+              </div>
+              {isSidebarOpen && (
+                <button
+                  onClick={() => { logout(); toast.success("Logged out"); fetchHistory(); playAudioChime("click"); }}
+                  className="text-[10px] uppercase font-mono font-bold text-alabaster-muted dark:text-obsidian-muted hover:text-red-500 transition-colors"
+                >
+                  Exit
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Navigation Items */}
+          <nav className="p-3 space-y-1.5">
             <SidebarItem
-              icon={<FileText size={20} />}
-              label="SUMMARY"
+              icon={<FileText size={18} />}
+              label="Summary"
               isActive={activeTab === "summary"}
-              onClick={() => setActiveTab("summary")}
+              onClick={() => handleSelectTab("summary")}
               isOpen={isSidebarOpen}
-              color="bg-neo-blue"
             />
             <SidebarItem
-              icon={<CheckSquare size={20} />}
-              label="QUIZ"
+              icon={<CheckSquare size={18} />}
+              label="Quiz & Recall"
               isActive={activeTab === "quiz"}
-              onClick={() => setActiveTab("quiz")}
+              onClick={() => handleSelectTab("quiz")}
               isOpen={isSidebarOpen}
-              color="bg-neo-green"
             />
             <SidebarItem
-              icon={<MessageSquare size={20} />}
-              label="CHAT"
+              icon={<MessageSquare size={18} />}
+              label="Academic Chat"
               isActive={activeTab === "chat"}
-              onClick={() => setActiveTab("chat")}
+              onClick={() => handleSelectTab("chat")}
               isOpen={isSidebarOpen}
-              color="bg-neo-yellow"
             />
             <SidebarItem
-              icon={<Presentation size={20} />}
-              label="SLIDES"
+              icon={<Presentation size={18} />}
+              label="Slide Creator"
               isActive={activeTab === "slides"}
-              onClick={() => setActiveTab("slides")}
+              onClick={() => handleSelectTab("slides")}
               isOpen={isSidebarOpen}
-              color="bg-neo-blue"
             />
             <SidebarItem
-              icon={<Files size={20} />}
-              label="SAMPLE PAPER"
+              icon={<Files size={18} />}
+              label="Sample Paper"
               isActive={activeTab === "sample_paper"}
-              onClick={() => setActiveTab("sample_paper")}
+              onClick={() => handleSelectTab("sample_paper")}
               isOpen={isSidebarOpen}
-              color="bg-neo-pink"
             />
             <SidebarItem
-              icon={<Volume2 size={20} />}
-              label="AI TEACHER"
+              icon={<Volume2 size={18} />}
+              label="Socratic Tutor"
               isActive={activeTab === "teacher"}
-              onClick={() => setActiveTab("teacher")}
+              onClick={() => handleSelectTab("teacher")}
               isOpen={isSidebarOpen}
-              color="bg-neo-purple"
             />
             <SidebarItem
-              icon={<Image size={20} />}
-              label="IMAGE GEN"
+              icon={<ImageIcon size={18} />}
+              label="Visual Schematics"
               isActive={activeTab === "image"}
-              onClick={() => setActiveTab("image")}
+              onClick={() => handleSelectTab("image")}
               isOpen={isSidebarOpen}
-              color="bg-neo-red"
+            />
+            <SidebarItem
+              icon={<Cpu size={18} />}
+              label="AI Engine Hub"
+              isActive={activeTab === "models"}
+              onClick={() => handleSelectTab("models")}
+              isOpen={isSidebarOpen}
             />
           </nav>
 
-          <div className="mt-4 pt-4 border-t-4 border-black px-4 mb-4">
+          {/* Past Sessions List */}
+          <div className="mt-4 pt-4 border-t border-alabaster-divider dark:border-obsidian-border px-3 mb-4">
             {isSidebarOpen && (
-              <h3 className="text-xs font-black text-gray-500 mb-2 tracking-widest">
-                YOUR SESSIONS
+              <h3 className="text-[11px] font-mono font-bold uppercase tracking-wider text-alabaster-muted dark:text-obsidian-muted mb-2 px-1">
+                Archival Sessions
               </h3>
             )}
-            <div className="space-y-2 pr-1">
+            <div className="space-y-1.5 pr-1">
+              {sessionHistory.length === 0 && isSidebarOpen && (
+                <p className="text-xs text-alabaster-muted dark:text-obsidian-muted italic px-1 font-mono">No past sessions</p>
+              )}
               {sessionHistory.map((session) => (
-                <button
+                <div
                   key={session.id}
                   onClick={() => switchSession(session.id)}
-                  className={`w-full text-left truncate text-sm px-2 py-2 border border-black hover:bg-gray-100 transition-colors shadow-neo-sm hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] ${
+                  className={`group flex items-center justify-between text-left truncate text-xs px-2.5 py-2 rounded-lg border transition-all cursor-pointer ${
                     currentSessionId === session.id
-                      ? "font-black bg-neo-yellow"
-                      : "bg-white"
+                      ? "bg-alabaster-pill dark:bg-obsidian-cyan/15 border-alabaster-accent dark:border-obsidian-cyan text-alabaster-accent dark:text-obsidian-cyan font-bold"
+                      : "bg-transparent border-transparent hover:bg-alabaster-inset dark:hover:bg-white/[0.03] text-alabaster-secondary dark:text-obsidian-secondary"
                   }`}
                   title={session.title}
                 >
-                  {isSidebarOpen ? session.title : "•"}
-                </button>
+                  <span className="truncate flex-1 font-mono">
+                    {isSidebarOpen ? session.title || "Study Session" : "•"}
+                  </span>
+                  {isSidebarOpen && (
+                    <button
+                      onClick={(e) => handleDeleteHistorySession(e, session.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-alabaster-muted hover:text-red-500 transition-opacity ml-1"
+                      title="Delete session"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="p-4 border-t-4 border-black space-y-3 bg-gray-50 mt-auto">
-          <div
-            className={`flex items-center ${isSidebarOpen ? "justify-between" : "justify-center"} gap-2`}
+        {/* Bottom Actions */}
+        <div className="p-3 border-t border-alabaster-border dark:border-obsidian-border bg-alabaster-inset/30 dark:bg-white/[0.01] space-y-2 mt-auto">
+          <button
+            onClick={() => {
+              localStorage.removeItem("study_session_id");
+              playAudioChime("click");
+              navigate("/");
+            }}
+            className={`btn-press flex items-center gap-2 w-full p-2.5 rounded-lg border border-alabaster-border dark:border-obsidian-border bg-alabaster-card dark:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary text-xs font-mono font-semibold hover:border-alabaster-accent dark:hover:border-obsidian-cyan ${!isSidebarOpen && "justify-center"}`}
           >
-            <button
-              onClick={() => {
-                localStorage.removeItem("study_session_id");
-                navigate("/");
-              }}
-              className={`flex items-center space-x-3 flex-1 p-3 font-bold border-2 border-black bg-white shadow-neo-sm hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all text-black ${!isSidebarOpen && "justify-center"}`}
-            >
-              <Plus size={20} className="stroke-2" />
-              {isSidebarOpen && (
-                <span className="uppercase text-sm">New Session</span>
-              )}
-            </button>
-          </div>
+            <Plus size={16} />
+            {isSidebarOpen && <span>New Session</span>}
+          </button>
+          
           <button
             onClick={handleEndSession}
-            className={`flex items-center space-x-3 w-full p-3 font-bold border-2 border-black bg-neo-red text-white shadow-neo-sm hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all ${!isSidebarOpen && "justify-center"}`}
+            className={`btn-press flex items-center gap-2 w-full p-2.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-mono font-semibold hover:bg-red-500/20 ${!isSidebarOpen && "justify-center"}`}
           >
-            <LogOut size={20} className="stroke-2" />
-            {isSidebarOpen && (
-              <span className="uppercase text-sm">Delete Session</span>
-            )}
+            <LogOut size={16} />
+            {isSidebarOpen && <span>Delete Active</span>}
           </button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative bg-main pattern-grid">
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden relative bg-alabaster-canvas dark:bg-obsidian-canvas">
+        
+        {/* Top Header Bar */}
+        <div className="border-b border-alabaster-border dark:border-obsidian-border bg-alabaster-card dark:bg-obsidian-elevated px-6 py-3 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+            <span className="font-garamond text-xl font-normal text-alabaster-primary dark:text-obsidian-primary truncate max-w-md">
+              {currentSessionRecord?.title || "Active Research Session"}
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold bg-alabaster-pill dark:bg-obsidian-cyan/15 text-alabaster-accent dark:text-obsidian-cyan border border-alabaster-pillBorder dark:border-obsidian-cyan/30 px-2 py-0.5 rounded">
+              <CheckCircle2 size={12} /> Neon PGVector Active
+            </span>
+            {sessionDocuments.length > 0 && (
+              <span className="hidden lg:inline text-xs font-mono text-alabaster-muted dark:text-obsidian-muted">
+                ({sessionDocuments.length} doc{sessionDocuments.length > 1 ? "s" : ""})
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Quick Ingest Button */}
+            <button
+              type="button"
+              onClick={() => { setUploadModalOpen(true); playAudioChime("click"); }}
+              className="btn-press bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas px-3.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm hover:bg-alabaster-accentHover dark:hover:bg-obsidian-cyanHover"
+            >
+              <Upload size={14} />
+              <span>+ Ingest Files</span>
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleCurrentTheme}
+              className="btn-press w-8 h-8 rounded-lg border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary flex items-center justify-center hover:border-alabaster-accent dark:hover:border-obsidian-cyan/50 hover:text-alabaster-accent dark:hover:text-obsidian-cyan transition-colors"
+              title="Toggle Theme"
+            >
+              {theme === "dark" ? <Sun size={15} className="text-obsidian-amber" /> : <Moon size={15} className="text-alabaster-accent" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Canvas Area */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
           <div className="max-w-6xl mx-auto h-full">
-            <div className="bg-white border-4 border-black shadow-neo-lg h-full rounded-2xl overflow-hidden flex flex-col">
-              {/* Component Container */}
-              <div className="flex-1 overflow-auto p-1">
-                {/* Render all components but hide inactive ones to preserve state */}
-                <div
-                  style={{
-                    display: activeTab === "summary" ? "block" : "none",
-                  }}
-                >
-                  <Summary />
-                </div>
-                <div
-                  style={{ display: activeTab === "quiz" ? "block" : "none" }}
-                >
-                  <Quiz />
-                </div>
-                <div
-                  style={{ display: activeTab === "chat" ? "block" : "none" }}
-                >
-                  <Chat />
-                </div>
-                <div
-                  style={{
-                    display: activeTab === "sample_paper" ? "block" : "none",
-                  }}
-                  className="h-full"
-                >
-                  <SamplePaper />
-                </div>
-                <div
-                  style={{
-                    display: activeTab === "teacher" ? "block" : "none",
-                  }}
-                  className="h-full"
-                >
-                  <Teacher />
-                </div>
-                <div
-                  style={{ display: activeTab === "image" ? "block" : "none" }}
-                  className="h-full"
-                >
-                  <ImageGenerator
-                    sessionId={localStorage.getItem("study_session_id") || ""}
-                  />
-                </div>
-                <div
-                  style={{ display: activeTab === "slides" ? "block" : "none" }}
-                >
-                  <SlidesGenerator
-                    sessionId={localStorage.getItem("study_session_id") || ""}
-                  />
-                </div>
-                <div
-                  style={{ display: activeTab === "models" ? "block" : "none" }}
-                >
-                  <ModelInfo />
-                </div>
+            <div className="bg-alabaster-card dark:bg-obsidian-elevated border border-alabaster-border dark:border-obsidian-border rounded-xl shadow-[0_2px_12px_rgba(20,53,39,0.05)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] h-full overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-auto p-1 custom-scrollbar">
+                {visitedTabs.has("summary") && (
+                  <div style={{ display: activeTab === "summary" ? "block" : "none" }}>
+                    <Summary />
+                  </div>
+                )}
+                {visitedTabs.has("quiz") && (
+                  <div style={{ display: activeTab === "quiz" ? "block" : "none" }}>
+                    <Quiz />
+                  </div>
+                )}
+                {visitedTabs.has("chat") && (
+                  <div style={{ display: activeTab === "chat" ? "block" : "none" }}>
+                    <Chat />
+                  </div>
+                )}
+                {visitedTabs.has("sample_paper") && (
+                  <div style={{ display: activeTab === "sample_paper" ? "block" : "none" }} className="h-full">
+                    <SamplePaper />
+                  </div>
+                )}
+                {visitedTabs.has("teacher") && (
+                  <div style={{ display: activeTab === "teacher" ? "block" : "none" }} className="h-full">
+                    <Teacher />
+                  </div>
+                )}
+                {visitedTabs.has("image") && (
+                  <div style={{ display: activeTab === "image" ? "block" : "none" }} className="h-full">
+                    <ImageGenerator sessionId={localStorage.getItem("study_session_id") || ""} />
+                  </div>
+                )}
+                {visitedTabs.has("slides") && (
+                  <div style={{ display: activeTab === "slides" ? "block" : "none" }}>
+                    <SlidesGenerator sessionId={localStorage.getItem("study_session_id") || ""} />
+                  </div>
+                )}
+                {visitedTabs.has("models") && (
+                  <div style={{ display: activeTab === "models" ? "block" : "none" }}>
+                    <ModelInfo />
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );
@@ -297,27 +527,25 @@ const SidebarItem = ({
   isActive,
   onClick,
   isOpen,
-  color,
 }: {
   icon: React.ReactNode;
   label: string;
   isActive: boolean;
   onClick: () => void;
   isOpen: boolean;
-  color: string;
 }) => (
   <button
     onClick={onClick}
-    className={`flex items-center space-x-3 w-full p-3 border-2 border-black transition-all duration-200 ${
+    className={`btn-press flex items-center gap-3 w-full p-2.5 rounded-lg transition-all duration-200 text-xs font-mono ${
       isActive
-        ? `${color} text-white shadow-neo-sm translate-x-[-2px] translate-y-[-2px]`
-        : "bg-white text-gray-500 hover:bg-gray-100 hover:text-black hover:shadow-neo-sm shadow-none"
+        ? "bg-alabaster-accent dark:bg-obsidian-cyan/15 text-white dark:text-obsidian-cyan border border-alabaster-accent dark:border-obsidian-cyan/30 shadow-sm font-bold"
+        : "text-alabaster-secondary dark:text-obsidian-secondary hover:text-alabaster-primary dark:hover:text-obsidian-primary hover:bg-alabaster-inset dark:hover:bg-white/[0.04] border border-transparent"
     } ${!isOpen && "justify-center"}`}
   >
-    <div className={`${!isActive && "text-black"}`}>{icon}</div>
-    {isOpen && (
-      <span className="font-bold text-sm tracking-wide">{label}</span>
-    )}
+    <div className={isActive ? "text-white dark:text-obsidian-cyan" : "text-alabaster-secondary dark:text-obsidian-secondary"}>
+      {icon}
+    </div>
+    {isOpen && <span>{label}</span>}
   </button>
 );
 

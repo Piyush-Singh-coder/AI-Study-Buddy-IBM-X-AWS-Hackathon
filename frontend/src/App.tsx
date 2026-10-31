@@ -11,7 +11,7 @@ import PricingPage from "./pages/PricingPage";
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#050506] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
         <Routes>
           {/* Public Home Page */}
           <Route path="/" element={<Home />} />

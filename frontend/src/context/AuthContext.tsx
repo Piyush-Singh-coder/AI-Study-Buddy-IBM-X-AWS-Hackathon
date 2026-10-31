@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { loginApi, registerApi, getMeApi } from "../services/api";
+import { loginApi, registerApi, getMeApi, claimSessionsApi } from "../services/api";
 
 export interface User {
   id: string;
@@ -51,6 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
+    const prevAnonId = localStorage.getItem("study_user_id");
     const res = await loginApi(email, password);
     const newToken = res.access_token;
     const localPlan = localStorage.getItem("study_user_plan") || "free";
@@ -61,9 +62,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem("study_auth_token", newToken);
     localStorage.setItem("study_user", JSON.stringify(loggedUser));
     localStorage.setItem("study_user_id", loggedUser.id);
+
+    if (prevAnonId && prevAnonId !== loggedUser.id) {
+      try {
+        await claimSessionsApi(prevAnonId);
+      } catch (e) {
+        console.error("Session claim note:", e);
+      }
+    }
   };
 
   const register = async (email: string, password: string) => {
+    const prevAnonId = localStorage.getItem("study_user_id");
     const res = await registerApi(email, password);
     const newToken = res.access_token;
     const registeredUser = { ...res.user, plan: "free" };
@@ -73,6 +83,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem("study_auth_token", newToken);
     localStorage.setItem("study_user", JSON.stringify(registeredUser));
     localStorage.setItem("study_user_id", registeredUser.id);
+
+    if (prevAnonId && prevAnonId !== registeredUser.id) {
+      try {
+        await claimSessionsApi(prevAnonId);
+      } catch (e) {
+        console.error("Session claim note:", e);
+      }
+    }
   };
 
   const logout = () => {
