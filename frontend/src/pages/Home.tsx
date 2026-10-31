@@ -15,7 +15,8 @@ import {
   Database,
   ChevronRight,
   BookOpen,
-  ArrowRight
+  ArrowRight,
+  Menu
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -31,6 +32,7 @@ const Home = () => {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [excerptModalOpen, setExcerptModalOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -219,20 +221,20 @@ const Home = () => {
         <span className="hidden md:inline font-mono text-[11px] text-alabaster-muted dark:text-obsidian-muted">Version 2.5.0-PROD</span>
       </aside>
 
-      {/* Sticky Header */}
-      <header className="sticky top-3 z-50 px-4 my-2">
-        <div className="max-w-[1100px] mx-auto bg-alabaster-card dark:bg-obsidian-elevated border border-alabaster-border dark:border-obsidian-border rounded-xl p-2.5 sm:px-6 flex items-center justify-between shadow-sm">
+      {/* Sticky Responsive Header */}
+      <header className="sticky top-2 z-50 px-2 sm:px-4 my-2">
+        <div className="max-w-[1100px] mx-auto bg-alabaster-card dark:bg-obsidian-elevated border border-alabaster-border dark:border-obsidian-border rounded-xl p-2 sm:p-2.5 sm:px-6 flex items-center justify-between shadow-sm">
           
           {/* Brand Logo */}
-          <Link to="/" onClick={() => playAudioChime("click")} className="flex items-center gap-3 group cursor-pointer">
+          <Link to="/" onClick={() => playAudioChime("click")} className="flex items-center gap-2 sm:gap-3 group cursor-pointer flex-shrink-0">
             <div className="w-8 h-8 rounded-lg bg-alabaster-primary dark:bg-white/[0.08] text-alabaster-card dark:text-obsidian-cyan flex items-center justify-center font-garamond text-xl font-bold group-hover:bg-alabaster-accent dark:group-hover:bg-obsidian-cyan dark:group-hover:text-obsidian-canvas border border-alabaster-primary/30 dark:border-obsidian-cyan/30 transition-all">
               F
             </div>
             <div className="flex flex-col">
-              <span className="font-bold tracking-tight text-base leading-none font-sans flex items-center gap-1.5 text-alabaster-primary dark:text-obsidian-primary">
-                AI STUDY BUDDY <span className="text-[10px] font-mono font-normal px-1.5 py-0.5 rounded bg-alabaster-pill dark:bg-obsidian-cyan/10 border border-alabaster-pillBorder dark:border-obsidian-cyan/20 text-alabaster-accent dark:text-obsidian-cyan uppercase tracking-wider">SCHOLAR</span>
+              <span className="font-bold tracking-tight text-sm sm:text-base leading-none font-sans flex items-center gap-1.5 text-alabaster-primary dark:text-obsidian-primary">
+                AI STUDY BUDDY <span className="hidden sm:inline text-[10px] font-mono font-normal px-1.5 py-0.5 rounded bg-alabaster-pill dark:bg-obsidian-cyan/10 border border-alabaster-pillBorder dark:border-obsidian-cyan/20 text-alabaster-accent dark:text-obsidian-cyan uppercase tracking-wider">SCHOLAR</span>
               </span>
-              <span className="text-[9px] tracking-widest text-alabaster-muted dark:text-obsidian-muted uppercase font-mono mt-0.5">Cognitive RAG Engine</span>
+              <span className="text-[9px] tracking-widest text-alabaster-muted dark:text-obsidian-muted uppercase font-mono mt-0.5">Cognitive RAG</span>
             </div>
           </Link>
 
@@ -246,12 +248,12 @@ const Home = () => {
           </nav>
 
           {/* Action buttons & Theme Switcher */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
             {/* Theme Toggle Button */}
             <button
               onClick={toggleCurrentTheme}
-              className="btn-press w-9 h-9 rounded-lg border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary flex items-center justify-center hover:border-alabaster-accent dark:hover:border-obsidian-cyan/50 hover:text-alabaster-accent dark:hover:text-obsidian-cyan transition-colors"
-              title={theme === "dark" ? "Switch to Alabaster Light" : "Switch to Linear Obsidian"}
+              className="btn-press w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary flex items-center justify-center hover:border-alabaster-accent dark:hover:border-obsidian-cyan/50 hover:text-alabaster-accent dark:hover:text-obsidian-cyan transition-colors"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
               aria-label="Toggle theme"
             >
               {theme === "dark" ? (
@@ -261,10 +263,10 @@ const Home = () => {
               )}
             </button>
 
-            {/* Auth Buttons */}
+            {/* Desktop Auth Buttons */}
             {user ? (
-              <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-2 bg-alabaster-pill dark:bg-obsidian-cyan/10 border border-alabaster-pillBorder dark:border-obsidian-cyan/30 px-3 py-1.5 rounded-lg text-xs font-mono font-medium text-alabaster-primary dark:text-obsidian-cyan">
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="flex items-center gap-2 bg-alabaster-pill dark:bg-obsidian-cyan/10 border border-alabaster-pillBorder dark:border-obsidian-cyan/30 px-3 py-1.5 rounded-lg text-xs font-mono font-medium text-alabaster-primary dark:text-obsidian-cyan">
                   <UserCheck size={14} />
                   <span className="truncate max-w-[120px]">{user.email}</span>
                 </div>
@@ -277,7 +279,7 @@ const Home = () => {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 <button
                   onClick={() => { setAuthMode("login"); setAuthModalOpen(true); playAudioChime("click"); }}
                   className="btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-alabaster-border dark:border-obsidian-border text-alabaster-secondary dark:text-obsidian-secondary hover:text-alabaster-primary dark:hover:text-obsidian-primary hover:border-alabaster-accent dark:hover:border-obsidian-cyan transition-colors"
@@ -286,19 +288,19 @@ const Home = () => {
                 </button>
                 <button
                   onClick={() => { setAuthMode("register"); setAuthModalOpen(true); playAudioChime("click"); }}
-                  className="btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-alabaster-accent dark:bg-obsidian-mint/15 text-white dark:text-obsidian-mint border border-alabaster-accent dark:border-obsidian-mint/30 hover:bg-alabaster-accentHover transition-colors hidden sm:block"
+                  className="btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-alabaster-accent dark:bg-obsidian-mint/15 text-white dark:text-obsidian-mint border border-alabaster-accent dark:border-obsidian-mint/30 hover:bg-alabaster-accentHover transition-colors"
                 >
                   Register
                 </button>
               </div>
             )}
 
-            {/* Dashboard Link */}
+            {/* Dashboard Link (Desktop) */}
             {user ? (
               <Link
                 to="/dashboard"
                 onClick={() => playAudioChime("click")}
-                className="btn-press bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas border border-alabaster-accent dark:border-obsidian-cyan rounded-lg px-4 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-[0_2px_8px_rgba(20,53,39,0.1)] dark:shadow-[0_0_16px_rgba(6,182,212,0.3)] hover:bg-alabaster-accentHover dark:hover:bg-obsidian-cyanHover transition-all"
+                className="hidden sm:flex btn-press bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas border border-alabaster-accent dark:border-obsidian-cyan rounded-lg px-3.5 py-1.5 text-xs font-semibold items-center gap-1.5 shadow-sm"
               >
                 <span>Dashboard</span>
                 <ChevronRight size={14} />
@@ -306,15 +308,71 @@ const Home = () => {
             ) : (
               <button
                 onClick={() => { setAuthMode("login"); setAuthModalOpen(true); playAudioChime("click"); }}
-                className="btn-press bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas border border-alabaster-accent dark:border-obsidian-cyan rounded-lg px-4 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-[0_2px_8px_rgba(20,53,39,0.1)] dark:shadow-[0_0_16px_rgba(6,182,212,0.3)] hover:bg-alabaster-accentHover dark:hover:bg-obsidian-cyanHover transition-all"
+                className="hidden sm:flex btn-press bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas border border-alabaster-accent dark:border-obsidian-cyan rounded-lg px-3.5 py-1.5 text-xs font-semibold items-center gap-1.5 shadow-sm"
               >
                 <span>Dashboard</span>
                 <ChevronRight size={14} />
               </button>
             )}
+
+            {/* Mobile Menu Toggle Button */}
+            <button
+              onClick={() => { setMobileMenuOpen(!mobileMenuOpen); playAudioChime("click"); }}
+              className="lg:hidden btn-press p-2 rounded-lg border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary flex items-center justify-center"
+              aria-label="Toggle Navigation Menu"
+            >
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
 
         </div>
+
+        {/* Mobile Dropdown Sheet */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden max-w-[1100px] mx-auto mt-2 bg-alabaster-card dark:bg-obsidian-elevated border border-alabaster-border dark:border-obsidian-border rounded-xl p-4 shadow-xl space-y-3">
+            <nav className="flex flex-col space-y-1 text-sm font-medium text-alabaster-secondary dark:text-obsidian-secondary border-b border-alabaster-divider dark:border-obsidian-border pb-3">
+              <a href="#capabilities" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">Capabilities</a>
+              <a href="#specimen" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">Codex Specimen</a>
+              <a href="#architecture" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">Architecture</a>
+              <a href="#testimonials" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">Reviews</a>
+              <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">FAQ</a>
+            </nav>
+
+            <div className="pt-1 flex flex-col gap-2">
+              {user ? (
+                <>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-alabaster-inset dark:bg-white/[0.02] border border-alabaster-border dark:border-obsidian-border text-xs font-mono">
+                    <span className="truncate max-w-[200px]">{user.email}</span>
+                    <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="text-red-500 font-bold uppercase text-[10px]">Exit</button>
+                  </div>
+                  <Link
+                    to="/dashboard"
+                    onClick={() => { setMobileMenuOpen(false); playAudioChime("click"); }}
+                    className="btn-press w-full py-2.5 bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas text-xs font-semibold rounded-lg flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <span>Open Dashboard</span>
+                    <ChevronRight size={14} />
+                  </Link>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); setAuthMode("login"); setAuthModalOpen(true); playAudioChime("click"); }}
+                    className="btn-press py-2.5 text-xs font-semibold rounded-lg border border-alabaster-border dark:border-obsidian-border text-alabaster-primary dark:text-obsidian-primary"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); setAuthMode("register"); setAuthModalOpen(true); playAudioChime("click"); }}
+                    className="btn-press py-2.5 text-xs font-semibold rounded-lg bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas"
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Hero Section */}
@@ -417,7 +475,7 @@ const Home = () => {
 
                   {/* Center Cover Typography */}
                   <div className="relative z-10 my-auto text-center py-4">
-                    <p className="text-xs uppercase tracking-widest text-[#FAF8F5]/70 font-mono mb-2">Mohd Atif Salmani</p>
+                    <p className="text-xs uppercase tracking-widest text-[#FAF8F5]/70 font-mono mb-2">Cognitive Scholar Press</p>
                     <h2 className="text-2xl sm:text-3xl font-garamond font-normal leading-tight tracking-tight text-[#FAF8F5]">
                       Quantum Neural Architectures & Cognitive Synthesis
                     </h2>
@@ -771,7 +829,7 @@ const Home = () => {
           <div className="md:col-span-3 space-y-3 text-xs font-mono">
             <p className="font-bold uppercase tracking-wider text-alabaster-primary dark:text-obsidian-primary">Project Colophon</p>
             <p className="text-alabaster-muted dark:text-obsidian-muted leading-relaxed">
-              Designed by Mohd Atif Salmani for advanced academic review. Typeset in EB Garamond and Figtree.
+              Designed for advanced academic review and deep comprehension. Typeset in EB Garamond and Figtree.
             </p>
             <p className="text-alabaster-muted dark:text-obsidian-muted pt-2">
               © 2026 AI Study Buddy Press. All rights reserved.

@@ -17,7 +17,8 @@ import {
   Upload,
   CheckCircle2,
   Sun,
-  Moon
+  Moon,
+  X
 } from "lucide-react";
 import Chat from "../components/Chat";
 import Quiz from "../components/Quiz";
@@ -51,6 +52,7 @@ const Dashboard = () => {
   const { user, logout, isLoaded } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sessionHistory, setSessionHistory] = useState<any[]>([]);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -62,6 +64,7 @@ const Dashboard = () => {
   const handleSelectTab = (tab: typeof activeTab) => {
     setActiveTab(tab);
     setVisitedTabs((prev) => new Set(prev).add(tab));
+    setMobileSidebarOpen(false);
     playAudioChime("click");
   };
 
@@ -243,17 +246,31 @@ const Dashboard = () => {
         onUploadSuccess={() => { fetchDocuments(); fetchHistory(); }}
       />
 
+      {/* Mobile Drawer Backdrop */}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-30 md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div
-        className={`${isSidebarOpen ? "w-64" : "w-20"} bg-alabaster-card dark:bg-obsidian-elevated border-r border-alabaster-border dark:border-obsidian-border transition-all duration-200 flex flex-col z-20 shadow-sm`}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-40 md:relative md:z-20
+          ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+          ${isSidebarOpen ? "md:w-64" : "md:w-20"}
+          w-72 bg-alabaster-card dark:bg-obsidian-elevated border-r border-alabaster-border dark:border-obsidian-border
+          transition-all duration-200 flex flex-col shadow-xl md:shadow-sm
+        `}
       >
         {/* Brand header */}
         <div className="p-4 sm:p-5 flex items-center justify-between border-b border-alabaster-border dark:border-obsidian-border bg-alabaster-inset/40 dark:bg-white/[0.02]">
-          {isSidebarOpen ? (
-            <Link to="/" onClick={() => playAudioChime("click")} className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-md bg-alabaster-primary dark:bg-white/[0.08] text-alabaster-card dark:text-obsidian-cyan flex items-center justify-center font-garamond text-base font-bold border border-alabaster-primary/30 dark:border-obsidian-cyan/30">
-                F
-              </div>
+          <Link to="/" onClick={() => playAudioChime("click")} className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md bg-alabaster-primary dark:bg-white/[0.08] text-alabaster-card dark:text-obsidian-cyan flex items-center justify-center font-garamond text-base font-bold border border-alabaster-primary/30 dark:border-obsidian-cyan/30 flex-shrink-0">
+              F
+            </div>
+            {(isSidebarOpen || mobileSidebarOpen) && (
               <div className="flex flex-col">
                 <span className="font-bold text-sm tracking-tight text-alabaster-primary dark:text-obsidian-primary">
                   STUDY BUDDY
@@ -262,19 +279,24 @@ const Dashboard = () => {
                   Cognitive Scholar
                 </span>
               </div>
-            </Link>
-          ) : (
-            <div className="w-7 h-7 rounded-md bg-alabaster-primary dark:bg-white/[0.08] text-alabaster-card dark:text-obsidian-cyan flex items-center justify-center font-garamond text-base font-bold mx-auto">
-              F
-            </div>
-          )}
-          <button
-            onClick={() => { setSidebarOpen(!isSidebarOpen); playAudioChime("click"); }}
-            className="btn-press p-1.5 rounded-md border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-secondary dark:text-obsidian-secondary hover:text-alabaster-primary dark:hover:text-obsidian-primary transition-colors"
-            title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
-          >
-            <Menu size={16} />
-          </button>
+            )}
+          </Link>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => { setSidebarOpen(!isSidebarOpen); playAudioChime("click"); }}
+              className="hidden md:flex btn-press p-1.5 rounded-md border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-secondary dark:text-obsidian-secondary hover:text-alabaster-primary dark:hover:text-obsidian-primary transition-colors"
+              title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+            >
+              <Menu size={16} />
+            </button>
+            <button
+              onClick={() => setMobileSidebarOpen(false)}
+              className="md:hidden btn-press p-1.5 rounded-md border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-secondary dark:text-obsidian-secondary"
+              title="Close Navigation"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable middle */}
@@ -423,18 +445,27 @@ const Dashboard = () => {
             {isSidebarOpen && <span>Delete Active</span>}
           </button>
         </div>
-      </div>
+      </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden relative bg-alabaster-canvas dark:bg-obsidian-canvas">
         
         {/* Top Header Bar */}
-        <div className="border-b border-alabaster-border dark:border-obsidian-border bg-alabaster-card dark:bg-obsidian-elevated px-6 py-3 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
-            <span className="font-garamond text-xl font-normal text-alabaster-primary dark:text-obsidian-primary truncate max-w-md">
+        <div className="border-b border-alabaster-border dark:border-obsidian-border bg-alabaster-card dark:bg-obsidian-elevated px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between z-10 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 truncate">
+            {/* Mobile Menu Trigger Button */}
+            <button
+              onClick={() => { setMobileSidebarOpen(true); playAudioChime("click"); }}
+              className="md:hidden btn-press p-1.5 rounded-lg border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary flex items-center justify-center flex-shrink-0"
+              title="Open Navigation"
+              aria-label="Open Navigation Menu"
+            >
+              <Menu size={18} />
+            </button>
+            <span className="font-garamond text-base sm:text-xl font-normal text-alabaster-primary dark:text-obsidian-primary truncate max-w-[140px] sm:max-w-md">
               {currentSessionRecord?.title || "Active Research Session"}
             </span>
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold bg-alabaster-pill dark:bg-obsidian-cyan/15 text-alabaster-accent dark:text-obsidian-cyan border border-alabaster-pillBorder dark:border-obsidian-cyan/30 px-2 py-0.5 rounded">
+            <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold bg-alabaster-pill dark:bg-obsidian-cyan/15 text-alabaster-accent dark:text-obsidian-cyan border border-alabaster-pillBorder dark:border-obsidian-cyan/30 px-2 py-0.5 rounded flex-shrink-0">
               <CheckCircle2 size={12} /> Neon PGVector Active
             </span>
             {sessionDocuments.length > 0 && (
@@ -444,15 +475,16 @@ const Dashboard = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {/* Quick Ingest Button */}
             <button
               type="button"
               onClick={() => { setUploadModalOpen(true); playAudioChime("click"); }}
-              className="btn-press bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas px-3.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm hover:bg-alabaster-accentHover dark:hover:bg-obsidian-cyanHover"
+              className="btn-press bg-alabaster-accent dark:bg-obsidian-cyan text-white dark:text-obsidian-canvas px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm hover:bg-alabaster-accentHover dark:hover:bg-obsidian-cyanHover"
             >
               <Upload size={14} />
-              <span>+ Ingest Files</span>
+              <span className="hidden sm:inline">+ Ingest Files</span>
+              <span className="sm:hidden">+ Ingest</span>
             </button>
 
             {/* Theme Toggle Button */}
@@ -467,7 +499,7 @@ const Dashboard = () => {
         </div>
 
         {/* Tab Canvas Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 custom-scrollbar">
           <div className="max-w-6xl mx-auto h-full">
             <div className="bg-alabaster-card dark:bg-obsidian-elevated border border-alabaster-border dark:border-obsidian-border rounded-xl shadow-[0_2px_12px_rgba(20,53,39,0.05)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] h-full overflow-hidden flex flex-col">
               <div className="flex-1 overflow-auto p-1 custom-scrollbar">
