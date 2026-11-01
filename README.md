@@ -60,7 +60,13 @@ graph TD
 - Generates high-resolution 2K technical schematics, vector flowcharts, biochemical pathways, and computer architecture diagrams.
 - Features preset concept suggestions and an interactive fullscreen lightbox viewer.
 
-### 7. Multi-Engine Inference Hub
+### 7. Dedicated Study Sessions Workspace
+- **Corpus Isolation & Switching**: Dedicated `/sessions` workspace to organize notes, lectures, and exams into isolated vector spaces.
+- **Corpus Inspection**: View document counts and filename badges for every study session.
+- **Inline Renaming & Deletion**: Rename sessions inline and delete obsolete sessions with automated vector index cleanup.
+- **Instant Activation**: Switch between study sessions in one click, rehydrating the dashboard with that session's materials.
+
+### 8. Multi-Engine Inference Hub
 - Switch between **Google Gemini 2.5 Flash**, **NVIDIA NIM (Nemotron 3.5 Bolt)**, and **OpenRouter** in real-time from the dashboard with live latency and tier-readiness monitoring.
 
 ---

@@ -18,7 +18,8 @@ import {
   CheckCircle2,
   Sun,
   Moon,
-  X
+  X,
+  Folder
 } from "lucide-react";
 import Chat from "../components/Chat";
 import Quiz from "../components/Quiz";
@@ -381,14 +382,36 @@ const Dashboard = () => {
               onClick={() => handleSelectTab("models")}
               isOpen={isSidebarOpen}
             />
+
+            <Link
+              to="/sessions"
+              onClick={() => playAudioChime("click")}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-transparent hover:border-alabaster-border dark:hover:border-obsidian-border text-xs font-mono text-alabaster-secondary dark:text-obsidian-secondary hover:text-alabaster-accent dark:hover:text-obsidian-cyan hover:bg-alabaster-inset dark:hover:bg-white/[0.04] transition-all ${
+                !isSidebarOpen && "justify-center"
+              }`}
+              title="Manage and switch study sessions"
+            >
+              <Folder size={18} />
+              {isSidebarOpen && <span>Study Sessions</span>}
+            </Link>
           </nav>
 
           {/* Past Sessions List */}
           <div className="mt-4 pt-4 border-t border-alabaster-divider dark:border-obsidian-border px-3 mb-4">
             {isSidebarOpen && (
-              <h3 className="text-[11px] font-mono font-bold uppercase tracking-wider text-alabaster-muted dark:text-obsidian-muted mb-2 px-1">
-                Archival Sessions
-              </h3>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <h3 className="text-[11px] font-mono font-bold uppercase tracking-wider text-alabaster-muted dark:text-obsidian-muted">
+                  Sessions ({sessionHistory.length})
+                </h3>
+                <Link
+                  to="/sessions"
+                  onClick={() => playAudioChime("click")}
+                  className="text-[11px] font-mono text-alabaster-accent dark:text-obsidian-cyan hover:underline flex items-center gap-0.5"
+                  title="View all sessions in dedicated workspace"
+                >
+                  Manage →
+                </Link>
+              </div>
             )}
             <div className="space-y-1.5 pr-1">
               {sessionHistory.length === 0 && isSidebarOpen && (
@@ -476,6 +499,17 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* All Sessions Link */}
+            <Link
+              to="/sessions"
+              onClick={() => playAudioChime("click")}
+              className="btn-press border border-alabaster-border dark:border-obsidian-border bg-alabaster-inset dark:bg-white/[0.04] text-alabaster-secondary dark:text-obsidian-secondary hover:text-alabaster-primary dark:hover:text-obsidian-primary hover:border-alabaster-accent dark:hover:border-obsidian-cyan px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+              title="Browse and Switch Study Sessions"
+            >
+              <Folder size={14} />
+              <span className="hidden sm:inline">Sessions</span>
+            </Link>
+
             {/* Quick Ingest Button */}
             <button
               type="button"

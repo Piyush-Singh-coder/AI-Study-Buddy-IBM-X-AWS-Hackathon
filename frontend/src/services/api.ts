@@ -69,14 +69,23 @@ export const getUserId = (): string => {
   return userId;
 };
 
+export interface SessionItem {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  documents?: string[];
+  document_count?: number;
+}
+
 // Session Management
-export const createSession = async () => {
+export const createSession = async (title?: string) => {
   const token = localStorage.getItem("study_auth_token");
   if (!token) {
     throw new Error("Authentication required: Please sign in or register to create a study session.");
   }
   const userId = localStorage.getItem("study_user_id") || "auth_user";
-  const response = await api.post("/session/create", { user_id: userId });
+  const response = await api.post("/session/create", { user_id: userId, title: title?.trim() });
   const sessionId = response.data?.session_id || response.data;
   if (typeof sessionId === "string") {
     localStorage.setItem("study_session_id", sessionId);
@@ -84,8 +93,13 @@ export const createSession = async () => {
   return sessionId;
 };
 
-export const getOrCreateSession = async () => {
-  return createSession();
+export const updateSessionTitle = async (sessionId: string, title: string) => {
+  const response = await api.patch(`/session/${sessionId}`, { title: title.trim() });
+  return response.data;
+};
+
+export const getOrCreateSession = async (title?: string) => {
+  return createSession(title);
 };
 
 export const deleteSession = async (sessionId: string) => {
@@ -93,7 +107,7 @@ export const deleteSession = async (sessionId: string) => {
   return response.data;
 };
 
-export const getSessionHistory = async () => {
+export const getSessionHistory = async (): Promise<SessionItem[]> => {
   const userId = getUserId();
   const response = await api.get(`/session/history/${userId}`);
   return response.data;

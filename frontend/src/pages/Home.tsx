@@ -240,6 +240,7 @@ const Home = () => {
 
           {/* Desktop Nav Links */}
           <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-alabaster-secondary dark:text-obsidian-secondary">
+            <Link to="/sessions" onClick={() => playAudioChime("click")} className="hover:text-alabaster-primary dark:hover:text-obsidian-primary transition-colors py-1">Sessions</Link>
             <a href="#capabilities" className="hover:text-alabaster-primary dark:hover:text-obsidian-primary transition-colors py-1">Capabilities</a>
             <a href="#specimen" className="hover:text-alabaster-primary dark:hover:text-obsidian-primary transition-colors py-1">Codex Specimen</a>
             <a href="#architecture" className="hover:text-alabaster-primary dark:hover:text-obsidian-primary transition-colors py-1">Architecture</a>
@@ -331,6 +332,10 @@ const Home = () => {
         {mobileMenuOpen && (
           <div className="lg:hidden max-w-[1100px] mx-auto mt-2 bg-alabaster-card dark:bg-obsidian-elevated border border-alabaster-border dark:border-obsidian-border rounded-xl p-4 shadow-xl space-y-3">
             <nav className="flex flex-col space-y-1 text-sm font-medium text-alabaster-secondary dark:text-obsidian-secondary border-b border-alabaster-divider dark:border-obsidian-border pb-3">
+              <Link to="/sessions" onClick={() => { setMobileMenuOpen(false); playAudioChime("click"); }} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary flex items-center justify-between font-semibold">
+                <span>Study Sessions</span>
+                <ChevronRight size={14} />
+              </Link>
               <a href="#capabilities" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">Capabilities</a>
               <a href="#specimen" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">Codex Specimen</a>
               <a href="#architecture" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg hover:bg-alabaster-inset dark:hover:bg-white/[0.04] text-alabaster-primary dark:text-obsidian-primary">Architecture</a>

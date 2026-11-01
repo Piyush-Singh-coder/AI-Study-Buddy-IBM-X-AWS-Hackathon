@@ -12,6 +12,10 @@ router = APIRouter()
 
 class SessionCreateRequest(BaseModel):
     user_id: Optional[str] = None
+    title: Optional[str] = None
+
+class SessionUpdateRequest(BaseModel):
+    title: str
 
 class SessionResponse(BaseModel):
     session_id: str
@@ -32,11 +36,12 @@ def create_session(
     """
     session_id = str(uuid.uuid4())
     effective_user_id = auth_user_id
+    session_title = (request.title.strip() if request and request.title and request.title.strip() else "New Session")
     
     new_session = StudySession(
         id=session_id,
         user_id=effective_user_id,
-        title="New Session"
+        title=session_title
     )
     try:
         db.add(new_session)
@@ -78,14 +83,75 @@ def get_session_history(
     db: Session = Depends(get_db),
     auth_user_id: str = Depends(get_authenticated_user_id)
 ):
-    """Get all past sessions for the authenticated user."""
+    """Get all past sessions for the authenticated user, enriched with document names and counts."""
     sessions = db.query(StudySession).filter(StudySession.user_id == auth_user_id).order_by(StudySession.updated_at.desc()).all()
-    return [{
-        "id": s.id,
-        "title": s.title or "Study Session",
-        "created_at": s.created_at,
-        "updated_at": s.updated_at
-    } for s in sessions]
+    
+    session_docs_map = {}
+    if sessions:
+        session_ids = [s.id for s in sessions]
+        try:
+            from sqlalchemy import text
+            from app.database import engine
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT DISTINCT cmetadata->>'session_id' as sid, cmetadata->>'source' as source FROM langchain_pg_embedding WHERE cmetadata->>'session_id' = ANY(:sids)"),
+                    {"sids": session_ids}
+                )
+                for row in result:
+                    sid, src = row[0], row[1]
+                    if sid and src:
+                        if sid not in session_docs_map:
+                            session_docs_map[sid] = set()
+                        session_docs_map[sid].add(src)
+        except Exception as e:
+            print(f"Note loading batch session documents: {e}")
+
+    history = []
+    for s in sessions:
+        docs = sorted(list(session_docs_map.get(s.id, set())))
+        if not docs:
+            try:
+                rag = RAGService(session_id=s.id)
+                docs = rag.get_session_documents_list()
+            except Exception:
+                docs = []
+
+        history.append({
+            "id": s.id,
+            "title": s.title or "Study Session",
+            "created_at": s.created_at,
+            "updated_at": s.updated_at,
+            "documents": docs,
+            "document_count": len(docs)
+        })
+    return history
+
+@router.patch("/{session_id}")
+def update_session(
+    session_id: str,
+    request: SessionUpdateRequest,
+    db: Session = Depends(get_db),
+    auth_user_id: str = Depends(get_authenticated_user_id)
+):
+    """Update study session title."""
+    session_record = db.query(StudySession).filter(StudySession.id == session_id).first()
+    if not session_record:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    if session_record.user_id and session_record.user_id != auth_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this session.")
+
+    new_title = request.title.strip()
+    if not new_title:
+        raise HTTPException(status_code=400, detail="Title cannot be empty.")
+
+    session_record.title = new_title
+    db.commit()
+    db.refresh(session_record)
+    return {
+        "id": session_record.id,
+        "title": session_record.title,
+        "message": "Session updated successfully"
+    }
 
 @router.delete("/history/{user_id}")
 def clear_user_sessions(

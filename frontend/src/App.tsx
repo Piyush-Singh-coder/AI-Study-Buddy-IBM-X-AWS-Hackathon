@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import ModelsPage from "./pages/ModelsPage";
 import PricingPage from "./pages/PricingPage";
+import SessionsPage from "./pages/SessionsPage";
 
 function App() {
   return (
@@ -18,6 +19,9 @@ function App() {
 
           {/* Pricing Page */}
           <Route path="/pricing" element={<PricingPage />} />
+
+          {/* Study Sessions Management */}
+          <Route path="/sessions" element={<SessionsPage />} />
 
           {/* Routes */}
           <Route path="/dashboard" element={<Dashboard />} />
